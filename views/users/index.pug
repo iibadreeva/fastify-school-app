@@ -1,0 +1,15 @@
+extends ../layout/page
+
+block content
+  h1.mb-4 Пользователи
+  table.table.table-striped.table-hover
+    thead
+      tr
+        th Имя
+        th Email
+    tbody
+      each user in users
+        tr
+          td
+            a(href=`/users/${user.id}`)= user.username
+          td= user.email

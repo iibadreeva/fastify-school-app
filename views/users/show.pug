@@ -1,0 +1,9 @@
+extends ../layout/page
+
+block content
+  h1= user.username
+  p
+    strong Email:
+    |
+    = user.email
+  a.btn.btn-secondary.mt-3(href="/users") ← К списку

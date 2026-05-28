@@ -1,0 +1,28 @@
+doctype html
+html(lang="ru")
+  head
+    meta(charset="utf-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    title= title
+    style.
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a1a2e;
+        line-height: 1.5;
+      }
+      h1 { color: #16213e; margin-bottom: 0.5rem; }
+      .badge {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        background: #e8f4f8;
+        font-size: 0.875rem;
+      }
+  body
+    h1= title
+    p= message
+    span.badge Pug + @fastify/view
