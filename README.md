@@ -77,8 +77,40 @@ fastify-school-app/
 | `GET` | `/phones` | JSON-массив телефонов |
 | `GET` | `/test` | `Hello World!` или `Hello {name}!` (query-параметр `name`) |
 | `GET` | `/test/:id` | HTML-страница с заголовком; параметр `:id` проходит через `sanitize-html` |
-| `GET` | `/courses` | HTML-список курсов (`views/curses.pug`) |
+| `GET` | `/courses` | HTML-список курсов (`views/curses.pug`); опциональный query-параметр `q` для поиска по названию или описанию |
 | `GET` | `/courses/:id/lessons/:postId` | `Course ID: {id}; Post ID: {postId}` (plain text) |
+
+### Курсы (`routes/root.js`, `views/curses.pug`)
+
+| Метод | URL | Ответ |
+|-------|-----|--------|
+| `GET` | `/courses` | Все курсы |
+| `GET` | `/courses?q=массивы` | «JS: Массивы» — подстрока есть в названии |
+| `GET` | `/courses?q=JavaScript` | Оба курса — подстрока есть в описании |
+| `GET` | `/courses?q=функции` | «JS: Функции» — совпадение в названии или описании |
+| `GET` | `/courses?q=python` | Пустой список и сообщение «Курсы не найдены» |
+
+Фильтрация работает на сервере: маршрут читает `req.query.q`, ищет подстроку в названии **или** описании курса (без учёта регистра) и передаёт результат в шаблон. На странице одна GET-форма — после отправки браузер открывает `/courses?q=...`, а введённый текст сохраняется в поле ввода.
+
+```javascript
+// routes/root.js
+const { q = '' } = req.query
+const filterQuery = q.trim()
+const query = filterQuery.toLowerCase()
+const courses = filterQuery
+  ? state.courses.filter((course) =>
+      course.title.toLowerCase().includes(query)
+      || course.description.toLowerCase().includes(query)
+    )
+  : state.courses
+```
+
+```pug
+// views/curses.pug — форма отправляет GET-запрос на /courses
+form(method="GET" action="/courses")
+  input(type="text" name="q" value=filterQuery placeholder="Поиск по названию или описанию")
+  button(type="submit") Найти
+```
 
 ### HTML через Pug (`routes/demo/index.js`)
 

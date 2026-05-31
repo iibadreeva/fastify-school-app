@@ -1,8 +1,23 @@
 extends layout/page
 block content
     h1= header
+    //- GET-форма: /courses?q=...
+    form.mb-4(method="GET" action="/courses")
+        .input-group
+            input.form-control(
+                type="search"
+                name="q"
+                value=filterQuery
+                placeholder="Поиск по названию или описанию"
+            )
+            button.btn.btn-primary(type="submit") Найти
     if courses.length === 0
-        p Пока не добавлено ни одного курса
+        if filterQuery
+            //- фильтр задан, но совпадений нет
+            p Курсы не найдены
+        else
+            //- курсов в системе пока нет
+            p Пока не добавлено ни одного курса
     else
         each course in courses
             div

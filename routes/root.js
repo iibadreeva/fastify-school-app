@@ -47,6 +47,10 @@ export default async function (fastify, opts) {
     res.send(`<h1>Course ID: ${clean}</h1>`)
   })
 
+  // GET /courses — все курсы
+  // GET /courses?q=массивы — курс, где «массивы» есть в названии или описании
+  // GET /courses?q=JavaScript — оба курса (подстрока в описании)
+  // GET /courses?q=python — пустой список, сообщение «Курсы не найдены»
   fastify.get('/courses', (req, res) => {
     const state = {
       courses: [
@@ -62,8 +66,19 @@ export default async function (fastify, opts) {
         },
       ],
     }
+    // query-параметр q из формы или URL: /courses?q=...
+    const { q = '' } = req.query
+    const filterQuery = q.trim()
+    const query = filterQuery.toLowerCase()
+    const courses = filterQuery
+      ? state.courses.filter((course) =>
+          course.title.toLowerCase().includes(query)
+          || course.description.toLowerCase().includes(query)
+        )
+      : state.courses
     const data = {
-      courses: state.courses, // Где-то хранится список курсов
+      courses,
+      filterQuery, // сохраняем текст в поле поиска
       header: 'Курсы по программированию',
     }
     return res.view('curses', data)
