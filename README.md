@@ -2,6 +2,21 @@
 
 Веб-приложение на [Fastify](https://fastify.dev/), собранное через [Fastify CLI](https://www.npmjs.com/package/fastify-cli). Отдаёт JSON и HTML-страницы (шаблоны Pug). Маршруты и плагины подключаются автоматически из папок `routes/` и `plugins/`.
 
+Если назвать одним словом — это многослойное монолитное веб-приложение (layered monolith) на Fastify (SSR).
+```bash
+HTTP-запрос
+    ↓
+plugins/          — инфраструктура (no-cache, middie, request-log, formbody, view, static, reverse-routes)
+    ↓
+routes/           — маршрутизация (URL → обработчик)
+    ↓
+controllers/      — сценарии HTTP (валидация, редирект, выбор шаблона)
+    ↓
+repositories/     — данные в памяти (CRUD, пейджинг)
+    ↓
+views/ (Pug)      — HTML-ответ
+```
+
 ## Создан проект с помощью
 
 ```bash
@@ -38,6 +53,9 @@ fastify-school-app/
 ├── plugins/            # Общие плагины (декораторы, хуки, утилиты)
 │   ├── sensible.js     # Удобные HTTP-ошибки (@fastify/sensible)
 │   ├── support.js      # Пример кастомного декоратора
+│   ├── no-cache.js     # Cache-Control: no-store на все ответы
+│   ├── middie.js       # Middleware Express-стиля (fastify.use)
+│   ├── request-log.js  # Access log в dev (morgan)
 │   ├── view.js         # Шаблонизатор Pug (@fastify/view)
 │   ├── formbody.js     # Парсинг HTML-форм (@fastify/formbody)
 │   ├── reverse-routes.js # Именованные URL (fastify.reverse)
@@ -89,6 +107,7 @@ fastify-school-app/
     │   ├── createUserSchema.test.js
     │   └── createCourseSchema.test.js
     ├── plugins/
+    │   ├── no-cache.test.js
     │   └── support.test.js
     └── routes/
         ├── courses.test.js
@@ -377,7 +396,48 @@ http://127.0.0.1:3000/test/%3Cscript%3Ealert('attack!')%3B%3C%2Fscript%3E
 
 ## Плагины
 
-Папка `plugins/` — для кода, общего для всего приложения: аутентификация, кэш, декораторы, хуки. Подробности — в [plugins/README.md](plugins/README.md).
+Папка `plugins/` — для кода, общего для всего приложения: аутентификация, кэш, декораторы, хуки. Файлы подхватываются [@fastify/autoload](https://github.com/fastify/fastify-autoload) в алфавитном порядке; порядок важен для связанных плагинов (`middie.js` → `request-log.js`).
+
+### Логирование HTTP-запросов (dev)
+
+| Плагин | Пакет | Назначение |
+|--------|-------|------------|
+| `plugins/middie.js` | [@fastify/middie](https://github.com/fastify/middie) | Включает `fastify.use()` для middleware в стиле Express |
+| `plugins/request-log.js` | [morgan](https://github.com/expressjs/morgan) | Печатает в консоль строку на каждый запрос, например `GET /users 200 12.345 ms` |
+
+**Где срабатывает:** на каждый входящий HTTP-запрос, до маршрутов и контроллеров — на уровне инфраструктуры, рядом с `formbody` и `static`.
+
+**Режимы:**
+
+- `npm run dev` — morgan включён (формат `dev`, цветной вывод).
+- `npm start` (`NODE_ENV=production`) — morgan **выключен**; остаётся встроенный [Pino](https://getpino.io/) через `fastify.log`, без дублирования access log.
+
+Чтобы подключить другое Express-middleware, зарегистрируйте его через `fastify.use(...)` в отдельном файле в `plugins/` и укажите зависимость `{ dependencies: ['middie'] }`, как в `request-log.js`.
+
+### Cache-Control: no-store
+
+Плагин `plugins/no-cache.js` через хук `onSend` добавляет ко **всем ответам** заголовок:
+
+```http
+Cache-Control: no-store
+```
+
+**Зачем это нужно** [^1][^2]
+
+| Проблема без заголовка | Что даёт `no-store` |
+|------------------------|---------------------|
+| Браузер может сохранить HTML/JSON и показать **устаревший** список пользователей или курсов после POST/PATCH/DELETE | Каждый запрос заново загружает актуальные данные с сервера |
+| После «Назад» в истории показывается **кэшированная** форма или страница (в т.ч. `/users`, редактирование с email) | Страницы не подставляются из локального кэша — нужен новый запрос к серверу |
+| **Конфиденциальные данные** (личный кабинет банка, профиль соцсети, история заказов): пользователь вышел из аккаунта, другой человек жмёт «Назад» — браузер показывает страницу **с диска без запроса к серверу** | При «Назад» браузер делает **реальный запрос**; сервер видит, что сессии нет, и отправляет на вход (в этом проекте auth пока нет, но заголовок готовит поведение для персональных данных) |
+| **Публичный компьютер** (интернет-кафе, библиотека): HTML и данные форм остаются **на жёстком диске** общего ПК | Копии просмотренных страниц **не сохраняются** на диске устройства (дополнение к выходу из аккаунта, не замена) |
+| Прокси и CDN могут **закэшировать** ответ и отдать его другому клиенту | Явный запрет хранить ответ где угодно (диск, память, промежуточные узлы) |
+
+`no-store` строже, чем `no-cache`: сервер и клиент **не должны сохранять** копию ответа. Для приложения с in-memory данными и HTML-формами это разумное значение по умолчанию.
+
+Проверка в DevTools → Network: у любого ответа (например `GET /users`) в заголовках Response должно быть `cache-control: no-store`.
+
+[^1]: [MDN — заголовок `Cache-Control`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control) (`no-store`: не сохранять ответ в кэше).
+[^2]: [OWASP — Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) (рекомендации по защите сессий и чувствительных данных в браузере).
 
 ## Тестирование
 
@@ -401,6 +461,8 @@ npm test
 - [@fastify/view](https://github.com/fastify/point-of-view) — шаблонизатор Pug
 - [@fastify/static](https://github.com/fastify/fastify-static) — статические файлы (`/assets/`)
 - [@fastify/sensible](https://github.com/fastify/fastify-sensible) — HTTP-ошибки
+- [@fastify/middie](https://github.com/fastify/middie) — middleware Express-стиля (`fastify.use`)
+- [morgan](https://github.com/expressjs/morgan) — access log в консоль (dev)
 - [Тестирование через `inject()`](https://fastify.dev/docs/latest/Guides/Testing/)
 
 ### Шаблоны и UI
