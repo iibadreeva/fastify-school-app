@@ -1,8 +1,7 @@
-import sanitizeHtml from 'sanitize-html'
+﻿import sanitizeHtml from 'sanitize-html'
 
 export default async function (fastify, opts) {
   fastify.get('/', async function (request, reply) {
-    // return { root: true }
     return reply.view('index', { root: true })
   })
   fastify.post('/', async function (request, res) {
@@ -32,61 +31,13 @@ export default async function (fastify, opts) {
     res.type('html')
 
     const clean = sanitizeHtml(id, {
-      // 1. Разрешаем только конкретные теги (тег <main> будет удален)
       allowedTags: [ 'h2', 'a', 'p' ],
-
-      // 2. Разрешаем конкретные атрибуты для конкретных тегов
       allowedAttributes: {
         'a': [ 'href', 'target' ]
       },
-
-      // 3. Разрешаем только безопасные протоколы для ссылок (javascript: заблокируется)
       allowedSchemes: [ 'http', 'https', 'mailto' ]
     });
 
     res.send(`<h1>Course ID: ${clean}</h1>`)
-  })
-
-  // GET /courses — все курсы
-  // GET /courses?q=массивы — курс, где «массивы» есть в названии или описании
-  // GET /courses?q=JavaScript — оба курса (подстрока в описании)
-  // GET /courses?q=python — пустой список, сообщение «Курсы не найдены»
-  fastify.get('/courses', (req, res) => {
-    const state = {
-      courses: [
-        {
-          id: 1,
-          title: 'JS: Массивы',
-          description: 'Курс про массивы в JavaScript',
-        },
-        {
-          id: 2,
-          title: 'JS: Функции',
-          description: 'Курс про функции в JavaScript',
-        },
-      ],
-    }
-    // query-параметр q из формы или URL: /courses?q=...
-    const { q = '' } = req.query
-    const filterQuery = q.trim()
-    const query = filterQuery.toLowerCase()
-    const courses = filterQuery
-      ? state.courses.filter((course) =>
-          course.title.toLowerCase().includes(query)
-          || course.description.toLowerCase().includes(query)
-        )
-      : state.courses
-    const data = {
-      courses,
-      filterQuery, // сохраняем текст в поле поиска
-      header: 'Курсы по программированию',
-    }
-    return res.view('curses', data)
-  })
-
-  fastify.get('/courses/:id/lessons/:postId', (req, res) => {
-    // /courses/5/lessons/10
-    const { id, postId } = req.params;
-    res.send(`Course ID: ${id}; Post ID: ${postId}`)
   })
 }

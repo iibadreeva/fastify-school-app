@@ -1,14 +1,24 @@
-import getUsers from '../../lib/getUsers.js'
-
-const users = getUsers()
+﻿import {
+  createUser,
+  findUserById,
+  getAllUsers,
+} from '../../lib/repositories/usersRepository.js'
 
 export default async function (fastify, opts) {
   fastify.get('/', async function (request, reply) {
-    return reply.view('users/index', { users })
+    return reply.view('users/index', { users: getAllUsers() })
+  })
+
+  fastify.post('/', async function (request, reply) {
+    const { username, email } = request.body
+
+    createUser({ username, email })
+
+    return reply.redirect('/users')
   })
 
   fastify.get('/:id', async function (request, reply) {
-    const user = users.find((u) => u.id === request.params.id)
+    const user = findUserById(request.params.id)
 
     if (!user) {
       return reply.code(404).send('User not found')

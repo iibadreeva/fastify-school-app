@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+﻿import { test } from 'node:test'
 import * as assert from 'node:assert'
 import { build } from '../helper.js'
 
@@ -19,6 +19,7 @@ test('courses index lists all courses', async (t) => {
   assert.match(res.payload, new RegExp(COURSE_ARRAYS))
   assert.match(res.payload, new RegExp(COURSE_FUNCTIONS))
   assert.match(res.payload, /Поиск по названию или описанию/)
+  assert.match(res.payload, /Добавить/)
 })
 
 test('courses search by title', async (t) => {
@@ -98,6 +99,31 @@ test('courses search preserves query in form', async (t) => {
   assert.equal(res.statusCode, 200)
   assert.match(res.payload, /name="q"/)
   assert.match(res.payload, /value="массивы"/)
+})
+
+test('create course redirects to courses list', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/courses',
+    payload: 'title=Ruby&description=Course+about+Ruby',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+  })
+
+  assert.equal(res.statusCode, 302)
+  assert.equal(res.headers.location, '/courses')
+
+  const list = await app.inject({
+    method: 'GET',
+    url: '/courses',
+  })
+
+  assert.equal(list.statusCode, 200)
+  assert.match(list.payload, /Ruby/)
+  assert.match(list.payload, /Course about Ruby/)
 })
 
 test('courses lesson route', async (t) => {

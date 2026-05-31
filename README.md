@@ -39,9 +39,14 @@ fastify-school-app/
 │   ├── sensible.js     # Удобные HTTP-ошибки (@fastify/sensible)
 │   ├── support.js      # Пример кастомного декоратора
 │   ├── view.js         # Шаблонизатор Pug (@fastify/view)
+│   ├── formbody.js     # Парсинг HTML-форм (@fastify/formbody)
 │   └── static.js       # Bootstrap CSS (/assets/)
 ├── lib/
-│   └── getUsers.js     # Список пользователей (@faker-js/faker)
+│   ├── getUsers.js     # Начальные данные пользователей (@faker-js/faker)
+│   ├── normalizeEmail.js
+│   └── repositories/
+│       ├── usersRepository.js
+│       └── coursesRepository.js
 ├── views/              # Pug-шаблоны
 │   ├── layout/
 │   │   └── page.pug    # Общий layout (Bootstrap, навигация)
@@ -52,6 +57,7 @@ fastify-school-app/
 ├── routes/             # HTTP-маршруты (каждый файл — Fastify-плагин)
 │   ├── root.js         # Маршруты в корне приложения
 │   ├── demo/           # Пример HTML-страницы (Pug), префикс /demo
+│   ├── courses/        # Курсы, префикс /courses
 │   └── users/          # Пользователи, префикс /users
 └── test/               # Тесты
 ```
@@ -67,6 +73,7 @@ fastify-school-app/
 | `routes/root.js` | *(корень)* | `GET /` |
 | `routes/demo/index.js` | `/demo` | `GET /demo` |
 | `routes/users/index.js` | `/users` | `GET /users` |
+| `routes/courses/index.js` | `/courses` | `GET /courses` |
 
 ### Маршруты в корне (`routes/root.js`)
 
@@ -77,39 +84,54 @@ fastify-school-app/
 | `GET` | `/phones` | JSON-массив телефонов |
 | `GET` | `/test` | `Hello World!` или `Hello {name}!` (query-параметр `name`) |
 | `GET` | `/test/:id` | HTML-страница с заголовком; параметр `:id` проходит через `sanitize-html` |
-| `GET` | `/courses` | HTML-список курсов (`views/curses.pug`); опциональный query-параметр `q` для поиска по названию или описанию |
-| `GET` | `/courses/:id/lessons/:postId` | `Course ID: {id}; Post ID: {postId}` (plain text) |
 
-### Курсы (`routes/root.js`, `views/curses.pug`)
+### Пользователи (`routes/users/index.js`)
 
 | Метод | URL | Ответ |
 |-------|-----|--------|
-| `GET` | `/courses` | Все курсы |
-| `GET` | `/courses?q=массивы` | «JS: Массивы» — подстрока есть в названии |
-| `GET` | `/courses?q=JavaScript` | Оба курса — подстрока есть в описании |
-| `GET` | `/courses?q=функции` | «JS: Функции» — совпадение в названии или описании |
-| `GET` | `/courses?q=python` | Пустой список и сообщение «Курсы не найдены» |
+| `GET` | `/users` | Таблица пользователей и форма добавления (`views/users/index.pug`) |
+| `POST` | `/users` | Создание пользователя, редирект на `/users` |
+| `GET` | `/users/:id` | Карточка пользователя или `404` с текстом `User not found` |
 
-Фильтрация работает на сервере: маршрут читает `req.query.q`, ищет подстроку в названии **или** описании курса (без учёта регистра) и передаёт результат в шаблон. На странице одна GET-форма — после отправки браузер открывает `/courses?q=...`, а введённый текст сохраняется в поле ввода.
+Данные хранятся в `lib/repositories/usersRepository.js`. Начальный список генерируется через `lib/getUsers.js` (100 пользователей, фиксированный seed). При создании email нормализуется через `lib/normalizeEmail.js` (trim + lowercase).
 
 ```javascript
-// routes/root.js
-const { q = '' } = req.query
-const filterQuery = q.trim()
-const query = filterQuery.toLowerCase()
-const courses = filterQuery
-  ? state.courses.filter((course) =>
-      course.title.toLowerCase().includes(query)
-      || course.description.toLowerCase().includes(query)
-    )
-  : state.courses
+// lib/normalizeEmail.js
+export default function normalizeEmail (email) {
+  return email.trim().toLowerCase()
+}
 ```
 
-```pug
-// views/curses.pug — форма отправляет GET-запрос на /courses
-form(method="GET" action="/courses")
-  input(type="text" name="q" value=filterQuery placeholder="Поиск по названию или описанию")
-  button(type="submit") Найти
+### Курсы (`routes/courses/index.js`, `views/curses.pug`)
+
+| Метод | URL | Ответ |
+|-------|-----|--------|
+| `GET` | `/courses` | HTML-список курсов; опциональный query-параметр `q` для поиска |
+| `POST` | `/courses` | Создание курса, редирект на `/courses` |
+| `GET` | `/courses/:id/lessons/:postId` | `Course ID: {id}; Post ID: {postId}` (plain text) |
+
+| `GET` | `/courses?q=массивы` | «JS: Массивы» — подстрока есть в названии |
+| `GET` | `/courses?q=JavaScript` | Оба курса — подстрока есть в описании |
+| `GET` | `/courses?q=python` | Пустой список и сообщение «Курсы не найдены» |
+
+Данные хранятся в `lib/repositories/coursesRepository.js`. Поиск и добавление курсов работают через формы на странице `/courses`. POST-запросы обрабатываются благодаря плагину `@fastify/formbody` (`plugins/formbody.js`).
+
+```javascript
+// routes/users/index.js
+fastify.post('/', async function (request, reply) {
+  const { username, email } = request.body
+  createUser({ username, email })
+  return reply.redirect('/users')
+})
+```
+
+```javascript
+// routes/courses/index.js
+fastify.post('/', async function (request, reply) {
+  const { title, description } = request.body
+  createCourse({ title, description })
+  return reply.redirect('/courses')
+})
 ```
 
 ### HTML через Pug (`routes/demo/index.js`)
@@ -119,15 +141,6 @@ form(method="GET" action="/courses")
 | `GET` | `/demo` | HTML-страница из шаблона `views/demo.pug` |
 
 Настройка движка шаблонов — в `plugins/view.js`. В маршруте используется `reply.view('demo', { title, message })`.
-
-### Пользователи (`routes/users/index.js`)
-
-| Метод | URL | Ответ |
-|-------|-----|--------|
-| `GET` | `/users` | Таблица пользователей (`views/users/index.pug`) |
-| `GET` | `/users/:id` | Карточка пользователя или `404` с текстом `User not found` |
-
-Данные генерируются в `lib/getUsers.js` (100 пользователей, фиксированный seed для воспроизводимости).
 
 **Когда что использовать:**
 

@@ -1,7 +1,14 @@
-extends layout/page
+﻿extends layout/page
 block content
     h1= header
-    //- GET-форма: /courses?q=...
+    form.mb-4(method="POST" action="/courses")
+        .row.g-3.mb-3
+            .col-md-5
+                input.form-control(type="text" name="title" placeholder="Название курса" required)
+            .col-md-5
+                input.form-control(type="text" name="description" placeholder="Описание курса" required)
+            .col-md-2
+                button.btn.btn-primary.w-100(type="submit") Добавить
     form.mb-4(method="GET" action="/courses")
         .input-group
             input.form-control(
@@ -13,10 +20,8 @@ block content
             button.btn.btn-primary(type="submit") Найти
     if courses.length === 0
         if filterQuery
-            //- фильтр задан, но совпадений нет
             p Курсы не найдены
         else
-            //- курсов в системе пока нет
             p Пока не добавлено ни одного курса
     else
         each course in courses
