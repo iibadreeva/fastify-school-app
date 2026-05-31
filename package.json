@@ -34,6 +34,7 @@
     "colorette": "^2.0.20",
     "commist": "^3.2.0",
     "cookie": "^1.1.1",
+    "crypto-js": "^4.2.0",
     "dateformat": "^4.6.3",
     "dequal": "^2.0.3",
     "end-of-stream": "^1.4.5",

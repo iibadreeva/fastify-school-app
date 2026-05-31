@@ -9,5 +9,11 @@ block content
     .mb-3
       label.form-label(for="email") Email
       input.form-control#email(type="email" name="email" required)
+    .mb-3
+      label.form-label(for="password") Пароль
+      input.form-control#password(type="password" name="password" required)
+    .mb-3
+      label.form-label(for="passwordConfirm") Подтверждение пароля
+      input.form-control#passwordConfirm(type="password" name="passwordConfirm" required)
     button.btn.btn-primary(type="submit") Добавить
     a.btn.btn-secondary.ms-2(href="/users") Отмена

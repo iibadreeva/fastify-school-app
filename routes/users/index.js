@@ -14,9 +14,13 @@ export default async function (fastify, opts) {
   })
 
   fastify.post('/', async function (request, reply) {
-    const { username, email } = request.body
+    const { username, email, password, passwordConfirm } = request.body
 
-    createUser({ username, email })
+    if (password !== passwordConfirm) {
+      return reply.code(400).send('Passwords do not match')
+    }
+
+    createUser({ username, email, password })
 
     return reply.redirect('/users')
   })

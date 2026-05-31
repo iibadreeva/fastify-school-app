@@ -31,6 +31,8 @@ test('new user form', async (t) => {
   assert.match(res.payload, /Новый пользователь/)
   assert.match(res.payload, /name="username"/)
   assert.match(res.payload, /name="email"/)
+  assert.match(res.payload, /name="password"/)
+  assert.match(res.payload, /name="passwordConfirm"/)
 })
 
 test('get user', async (t) => {
@@ -65,7 +67,7 @@ test('create user redirects to users list and normalizes email', async (t) => {
   const res = await app.inject({
     method: 'POST',
     url: '/users',
-    payload: 'username=New+User&email=Test%40Example.COM',
+    payload: 'username=New+User&email=Test%40Example.COM&password=secret&passwordConfirm=secret',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
     },

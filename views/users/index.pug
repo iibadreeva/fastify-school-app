@@ -8,9 +8,11 @@ block content
       tr
         th Имя
         th Email
+        th password
     tbody
       each user in users
         tr
           td
             a(href=`/users/${user.id}`)= user.username
           td= user.email
+          td= user.password
