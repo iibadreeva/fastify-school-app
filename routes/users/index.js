@@ -9,6 +9,10 @@ export default async function (fastify, opts) {
     return reply.view('users/index', { users: getAllUsers() })
   })
 
+  fastify.get('/new', { name: 'newUser' }, async function (request, reply) {
+    return reply.view('users/new')
+  })
+
   fastify.post('/', async function (request, reply) {
     const { username, email } = request.body
 

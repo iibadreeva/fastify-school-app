@@ -2,14 +2,7 @@
 
 block content
   h1.mb-4 Пользователи
-  form.mb-4(method="POST" action="/users")
-    .row.g-3
-      .col-md-4
-        input.form-control(type="text" name="username" placeholder="Имя пользователя" required)
-      .col-md-4
-        input.form-control(type="email" name="email" placeholder="Email" required)
-      .col-md-4
-        button.btn.btn-primary(type="submit") Добавить пользователя
+  a.btn.btn-primary.mb-4(href="/users/new") Новый пользователь
   table.table.table-striped.table-hover
     thead
       tr

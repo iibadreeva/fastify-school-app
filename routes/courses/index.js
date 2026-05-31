@@ -15,11 +15,15 @@ export default async function (fastify, opts) {
         )
       : getAllCourses()
 
-    return reply.view('curses', {
+    return reply.view('courses/index', {
       courses,
       filterQuery,
       header: 'Курсы по программированию',
     })
+  })
+
+  fastify.get('/new', { name: 'newCourse' }, async function (request, reply) {
+    return reply.view('courses/new')
   })
 
   fastify.post('/', async function (request, reply) {

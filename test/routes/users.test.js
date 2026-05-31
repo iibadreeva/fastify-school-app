@@ -16,7 +16,21 @@ test('users index', async (t) => {
   assert.equal(res.statusCode, 200)
   assert.match(res.payload, new RegExp(users[0].username))
   assert.match(res.payload, new RegExp(users[0].email))
-  assert.match(res.payload, /Добавить пользователя/)
+  assert.match(res.payload, /Новый пользователь/)
+})
+
+test('new user form', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'GET',
+    url: '/users/new',
+  })
+
+  assert.equal(res.statusCode, 200)
+  assert.match(res.payload, /Новый пользователь/)
+  assert.match(res.payload, /name="username"/)
+  assert.match(res.payload, /name="email"/)
 })
 
 test('get user', async (t) => {

@@ -45,21 +45,36 @@ fastify-school-app/
 │   ├── getUsers.js     # Начальные данные пользователей (@faker-js/faker)
 │   ├── normalizeEmail.js
 │   └── repositories/
-│       ├── usersRepository.js
-│       └── coursesRepository.js
+│       ├── usersRepository.js   # In-memory хранилище пользователей
+│       └── coursesRepository.js # In-memory хранилище курсов
 ├── views/              # Pug-шаблоны
 │   ├── layout/
 │   │   └── page.pug    # Общий layout (Bootstrap, навигация)
 │   ├── index.pug       # Главная страница
-│   ├── curses.pug      # Список курсов
 │   ├── demo.pug
+│   ├── courses/
+│   │   ├── index.pug   # Список курсов и поиск
+│   │   └── new.pug     # Форма создания курса
 │   └── users/
+│       ├── index.pug   # Список пользователей
+│       ├── new.pug     # Форма создания пользователя
+│       └── show.pug    # Карточка пользователя
 ├── routes/             # HTTP-маршруты (каждый файл — Fastify-плагин)
 │   ├── root.js         # Маршруты в корне приложения
 │   ├── demo/           # Пример HTML-страницы (Pug), префикс /demo
 │   ├── courses/        # Курсы, префикс /courses
 │   └── users/          # Пользователи, префикс /users
 └── test/               # Тесты
+    ├── helper.js
+    ├── lib/
+    │   └── normalizeEmail.test.js
+    ├── plugins/
+    │   └── support.test.js
+    └── routes/
+        ├── courses.test.js
+        ├── demo.test.js
+        ├── root.test.js
+        └── users.test.js
 ```
 
 Точка входа для CLI — `app.js`. Файлы `index.js` и `src/index.js` в репозитории не используются при запуске через `npm run dev` / `npm start`.
@@ -89,7 +104,8 @@ fastify-school-app/
 
 | Метод | URL | Ответ |
 |-------|-----|--------|
-| `GET` | `/users` | Таблица пользователей и форма добавления (`views/users/index.pug`) |
+| `GET` | `/users` | Таблица пользователей (`views/users/index.pug`) |
+| `GET` | `/users/new` | Форма создания пользователя (`views/users/new.pug`, имя маршрута `newUser`) |
 | `POST` | `/users` | Создание пользователя, редирект на `/users` |
 | `GET` | `/users/:id` | Карточка пользователя или `404` с текстом `User not found` |
 
@@ -107,6 +123,7 @@ export default function normalizeEmail (email) {
 | Метод | URL | Ответ |
 |-------|-----|--------|
 | `GET` | `/courses` | HTML-список курсов; опциональный query-параметр `q` для поиска |
+| `GET` | `/courses/new` | Форма создания курса (`views/courses/new.pug`, имя маршрута `newCourse`) |
 | `POST` | `/courses` | Создание курса, редирект на `/courses` |
 | `GET` | `/courses/:id/lessons/:postId` | `Course ID: {id}; Post ID: {postId}` (plain text) |
 
@@ -118,6 +135,10 @@ export default function normalizeEmail (email) {
 
 ```javascript
 // routes/users/index.js
+fastify.get('/new', { name: 'newUser' }, async function (request, reply) {
+  return reply.view('users/new')
+})
+
 fastify.post('/', async function (request, reply) {
   const { username, email } = request.body
   createUser({ username, email })
@@ -127,6 +148,10 @@ fastify.post('/', async function (request, reply) {
 
 ```javascript
 // routes/courses/index.js
+fastify.get('/new', { name: 'newCourse' }, async function (request, reply) {
+  return reply.view('courses/new')
+})
+
 fastify.post('/', async function (request, reply) {
   const { title, description } = request.body
   createCourse({ title, description })

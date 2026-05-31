@@ -19,7 +19,21 @@ test('courses index lists all courses', async (t) => {
   assert.match(res.payload, new RegExp(COURSE_ARRAYS))
   assert.match(res.payload, new RegExp(COURSE_FUNCTIONS))
   assert.match(res.payload, /Поиск по названию или описанию/)
-  assert.match(res.payload, /Добавить/)
+  assert.match(res.payload, /Новый курс/)
+})
+
+test('new course form', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'GET',
+    url: '/courses/new',
+  })
+
+  assert.equal(res.statusCode, 200)
+  assert.match(res.payload, /Новый курс/)
+  assert.match(res.payload, /name="title"/)
+  assert.match(res.payload, /name="description"/)
 })
 
 test('courses search by title', async (t) => {

@@ -1,14 +1,7 @@
-﻿extends layout/page
+﻿extends ../layout/page
 block content
     h1= header
-    form.mb-4(method="POST" action="/courses")
-        .row.g-3.mb-3
-            .col-md-5
-                input.form-control(type="text" name="title" placeholder="Название курса" required)
-            .col-md-5
-                input.form-control(type="text" name="description" placeholder="Описание курса" required)
-            .col-md-2
-                button.btn.btn-primary.w-100(type="submit") Добавить
+    a.btn.btn-primary.mb-4(href="/courses/new") Новый курс
     form.mb-4(method="GET" action="/courses")
         .input-group
             input.form-control(
