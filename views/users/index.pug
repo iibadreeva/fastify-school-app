@@ -9,6 +9,7 @@ block content
         th Имя
         th Email
         th password
+        th.text-end Действия
     tbody
       each user in users
         tr
@@ -16,3 +17,8 @@ block content
             a(href=reverse(RouteNames.SHOW_USER, { id: user.id }))= user.username
           td= user.email
           td= user.password
+          td.text-end
+            a.btn.btn-sm.btn-outline-primary.me-1(href=reverse(RouteNames.EDIT_USER, { id: user.id })) Редактировать
+            form.d-inline(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }) onsubmit="return confirm('Удалить пользователя?')")
+              input(type="hidden" name="_method" value="DELETE")
+              button.btn.btn-sm.btn-outline-danger(type="submit") Удалить

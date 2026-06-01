@@ -1,0 +1,53 @@
+extends ../layout/page
+
+block content
+  h1.mb-4 Редактирование пользователя
+  form(method="POST" action=reverse(RouteNames.UPDATE_USER, { id: user.id }) novalidate)
+    input(type="hidden" name="_method" value="PATCH")
+    .mb-3
+      label.form-label(for="username") Имя пользователя
+      input.form-control#username(
+        type="text"
+        name="username"
+        value=values && values.username ? values.username : ''
+        class=(errors && errors.username) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.username
+        .invalid-feedback= errors.username
+    .mb-3
+      label.form-label(for="email") Email
+      input.form-control#email(
+        type="email"
+        name="email"
+        value=values && values.email ? values.email : ''
+        class=(errors && errors.email) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.email
+        .invalid-feedback= errors.email
+    .mb-3
+      label.form-label(for="password") Новый пароль
+      small.text-muted.d-block Оставьте пустым, если не меняете пароль
+      input.form-control#password(
+        type="password"
+        name="password"
+        class=(errors && errors.password) ? 'is-invalid' : undefined
+      )
+      if errors && errors.password
+        .invalid-feedback= errors.password
+    .mb-3
+      label.form-label(for="passwordConfirm") Подтверждение пароля
+      input.form-control#passwordConfirm(
+        type="password"
+        name="passwordConfirm"
+        class=(errors && errors.passwordConfirm) ? 'is-invalid' : undefined
+      )
+      if errors && errors.passwordConfirm
+        .invalid-feedback= errors.passwordConfirm
+    button.btn.btn-primary(type="submit") Сохранить
+    a.btn.btn-secondary.ms-2(href=reverse(RouteNames.SHOW_USER, { id: user.id })) Отмена
+  hr.my-4
+  form(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }) onsubmit="return confirm('Удалить пользователя?')")
+    input(type="hidden" name="_method" value="DELETE")
+    button.btn.btn-danger(type="submit") Удалить пользователя

@@ -176,6 +176,79 @@ test('create course redirects to courses list', async (t) => {
   assert.match(list.payload, /Course about Ruby/)
 })
 
+test('show course page', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'GET',
+    url: '/courses/1',
+  })
+
+  assert.equal(res.statusCode, 200)
+  assert.match(res.payload, new RegExp(COURSE_ARRAYS))
+  assert.match(res.payload, /Редактировать/)
+})
+
+test('edit course form', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'GET',
+    url: '/courses/1/edit',
+  })
+
+  assert.equal(res.statusCode, 200)
+  assert.match(res.payload, /Редактирование курса/)
+  assert.match(res.payload, /value="PATCH"/)
+})
+
+test('patch course updates and redirects to show', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'PATCH',
+    url: '/courses/1',
+    payload: 'title=Updated+Course&description=Updated+description+for+course+one',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  })
+
+  assert.equal(res.statusCode, 302)
+  assert.equal(res.headers.location, '/courses/1')
+
+  const show = await app.inject({ method: 'GET', url: '/courses/1' })
+  assert.match(show.payload, /Updated Course/)
+  assert.match(show.payload, /Updated description for course one/)
+})
+
+test('delete course removes from list', async (t) => {
+  const app = await build(t)
+
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/courses',
+    payload: 'title=Temp+Course&description=Temporary+course+description+here',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  })
+  assert.equal(createRes.statusCode, 302)
+
+  const listBefore = await app.inject({ method: 'GET', url: '/courses' })
+  assert.match(listBefore.payload, /Temp Course/)
+
+  const idMatch = listBefore.payload.match(/href="\/courses\/(\d+)"[^>]*>\s*Temp Course/)
+  assert.ok(idMatch, 'course id not found in list')
+  const id = idMatch[1]
+
+  const res = await app.inject({
+    method: 'DELETE',
+    url: `/courses/${id}`,
+  })
+
+  assert.equal(res.statusCode, 302)
+
+  const listAfter = await app.inject({ method: 'GET', url: '/courses' })
+  assert.doesNotMatch(listAfter.payload, /Temp Course/)
+})
+
 test('courses lesson route', async (t) => {
   const app = await build(t)
 

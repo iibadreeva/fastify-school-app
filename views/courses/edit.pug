@@ -1,0 +1,34 @@
+extends ../layout/page
+
+block content
+  h1.mb-4 Редактирование курса
+  form(method="POST" action=reverse(RouteNames.UPDATE_COURSE, { id: course.id }) novalidate)
+    input(type="hidden" name="_method" value="PATCH")
+    .mb-3
+      label.form-label(for="title") Название курса
+      input.form-control#title(
+        type="text"
+        name="title"
+        value=values && values.title ? values.title : ''
+        class=(errors && errors.title) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.title
+        .invalid-feedback= errors.title
+    .mb-3
+      label.form-label(for="description") Описание курса
+      input.form-control#description(
+        type="text"
+        name="description"
+        value=values && values.description ? values.description : ''
+        class=(errors && errors.description) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.description
+        .invalid-feedback= errors.description
+    button.btn.btn-primary(type="submit") Сохранить
+    a.btn.btn-secondary.ms-2(href=reverse(RouteNames.SHOW_COURSE, { id: course.id })) Отмена
+  hr.my-4
+  form(method="POST" action=reverse(RouteNames.DELETE_COURSE, { id: course.id }) onsubmit="return confirm('Удалить курс?')")
+    input(type="hidden" name="_method" value="DELETE")
+    button.btn.btn-danger(type="submit") Удалить курс

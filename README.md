@@ -48,10 +48,13 @@ fastify-school-app/
 │   ├── hashPassword.js
 │   ├── RouteNames.js   # Константы имён маршрутов (для fastify.reverse)
 │   ├── schemas/
-│   │   ├── createUserSchema.js   # Yup-схема валидации пользователя
-│   │   └── createCourseSchema.js # Yup-схема валидации курса
+│   │   ├── createUserSchema.js   # Yup: создание пользователя
+│   │   ├── updateUserSchema.js   # Yup: редактирование (PATCH)
+│   │   ├── createCourseSchema.js # Yup: создание курса
+│   │   └── updateCourseSchema.js # Yup: редактирование курса
 │   ├── validation/
-│   │   └── formatYupErrors.js   # Преобразование ошибок Yup для шаблона
+│   │   ├── formatYupErrors.js    # Ошибки Yup → объект для Pug
+│   │   └── stripFormMethod.js    # _method PATCH/DELETE в HTML-формах
 │   └── repositories/
 │       ├── usersRepository.js   # In-memory хранилище пользователей
 │       └── coursesRepository.js # In-memory хранилище курсов
@@ -61,12 +64,15 @@ fastify-school-app/
 │   ├── index.pug       # Главная страница
 │   ├── demo.pug
 │   ├── courses/
-│   │   ├── index.pug   # Список курсов и поиск
-│   │   └── new.pug     # Форма создания курса
+│   │   ├── index.pug   # Список, поиск, кнопки редактирования/удаления
+│   │   ├── new.pug     # Создание
+│   │   ├── show.pug    # Просмотр
+│   │   └── edit.pug    # Редактирование (PATCH) и удаление
 │   └── users/
-│       ├── index.pug   # Список пользователей
-│       ├── new.pug     # Форма создания пользователя
-│       └── show.pug    # Карточка пользователя
+│       ├── index.pug   # Список, кнопки редактирования/удаления
+│       ├── new.pug     # Создание
+│       ├── show.pug    # Просмотр (кнопка «Редактировать»)
+│       └── edit.pug    # Редактирование (PATCH) и удаление
 ├── routes/             # HTTP-маршруты (каждый файл — Fastify-плагин)
 │   ├── root.js         # Маршруты в корне приложения
 │   ├── demo/           # Пример HTML-страницы (Pug), префикс /demo
@@ -122,6 +128,28 @@ a(href=reverse(RouteNames.SHOW_USER, { id: user.id }))= user.username
 
 Префиксы URL задаёт autoload по имени папки (`routes/users` → `/users`, `routes/courses` → `/courses`). Менять путь можно, переименовав папку — ссылки в шаблонах и редиректах обновятся автоматически.
 
+Константы имён — в `lib/RouteNames.js` (например `RouteNames.EDIT_USER` → `'editUser'`).
+
+### PATCH и DELETE из HTML-форм
+
+Браузер отправляет формы только методами **GET** и **POST**. Для редактирования и удаления:
+
+1. Зарегистрированы настоящие маршруты `PATCH` и `DELETE` (удобно для тестов и API).
+2. Дополнительно `POST /users/:id` и `POST /courses/:id` читают скрытое поле `_method`:
+
+```pug
+form(method="POST" action=reverse(RouteNames.UPDATE_USER, { id: user.id }))
+  input(type="hidden" name="_method" value="PATCH")
+```
+
+```pug
+form(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }))
+  input(type="hidden" name="_method" value="DELETE")
+  button(type="submit") Удалить
+```
+
+`lib/validation/stripFormMethod.js` извлекает `_method` и удаляет его из `request.body` перед валидацией Yup.
+
 ### Маршруты в корне (`routes/root.js`)
 
 | Метод | URL | Ответ |
@@ -134,18 +162,24 @@ a(href=reverse(RouteNames.SHOW_USER, { id: user.id }))= user.username
 
 ### Пользователи (`routes/users/index.js`)
 
+Порядок регистрации маршрутов важен: `/new` и `/:id/edit` — **до** `/:id`.
+
 | Метод | URL | Имя маршрута | Ответ |
 |-------|-----|--------------|--------|
-| `GET` | `/users` | `usersIndex` | Таблица пользователей (`views/users/index.pug`) |
-| `GET` | `/users/new` | `newUser` | Форма создания пользователя |
-| `POST` | `/users` | `createUser` | Создание с валидацией (Yup); редирект на `/users` или форма с ошибками (422) |
-| `GET` | `/users/:id` | `showUser` | Карточка пользователя или `404` |
+| `GET` | `/users` | `usersIndex` | Таблица; ссылки редактирования/удаления |
+| `GET` | `/users/new` | `newUser` | Форма создания |
+| `POST` | `/users` | `createUser` | Создание (Yup); редирект на `/users` или 422 |
+| `GET` | `/users/:id/edit` | `editUser` | Форма редактирования |
+| `PATCH` | `/users/:id` | `updateUser` | Обновление (Yup); редирект на карточку или 422 |
+| `DELETE` | `/users/:id` | `deleteUser` | Удаление; редирект на `/users` |
+| `POST` | `/users/:id` | — | То же, что PATCH/DELETE при `_method` в форме |
+| `GET` | `/users/:id` | `showUser` | Карточка; кнопка «Редактировать» |
 
-Данные хранятся в `lib/repositories/usersRepository.js`. Начальный список генерируется через `lib/getUsers.js` (100 пользователей, фиксированный seed). При создании email нормализуется через `lib/normalizeEmail.js` (trim + lowercase), пароль хешируется через `lib/hashPassword.js`.
+Данные — `lib/repositories/usersRepository.js` (in-memory). Стартовые пользователи: `lib/getUsers.js` (seed). Email нормализуется (`lib/normalizeEmail.js`), пароль хешируется (`lib/hashPassword.js`).
 
-#### Валидация формы (Yup)
+#### Создание (POST)
 
-Перед созданием пользователя данные проверяются схемой `lib/schemas/createUserSchema.js`:
+Схема `lib/schemas/createUserSchema.js`:
 
 | Поле | Правила |
 |------|---------|
@@ -154,7 +188,20 @@ a(href=reverse(RouteNames.SHOW_USER, { id: user.id }))= user.username
 | `password` | обязательный, минимум 6 символов |
 | `passwordConfirm` | обязательный, должен совпадать с `password` |
 
-При ошибке валидации обработчик `POST /users` возвращает статус **422** и снова рендерит `views/users/new.pug` с объектами `errors` и `values` (имя и email сохраняются в полях, пароли не подставляются).
+При ошибке — **422** и `views/users/new.pug` с `errors` и `values`.
+
+#### Редактирование (PATCH)
+
+Схема `createUpdateUserSchema(userId)` в `lib/schemas/updateUserSchema.js`:
+
+| Поле | Правила |
+|------|---------|
+| `username` | как при создании |
+| `email` | уникальный, **кроме** редактируемого пользователя |
+| `password` | необязательный; пустое поле — пароль не меняется |
+| `passwordConfirm` | обязателен только если указан `password` |
+
+Форма: `views/users/edit.pug`. Удаление — на страницах `show`, `edit` и в списке `index`.
 
 ```javascript
 // lib/schemas/createUserSchema.js
@@ -199,31 +246,42 @@ export default function normalizeEmail (email) {
 }
 ```
 
-### Курсы (`routes/courses/index.js`, `views/courses/index.pug`)
+### Курсы (`routes/courses/index.js`)
 
 | Метод | URL | Имя маршрута | Ответ |
 |-------|-----|--------------|--------|
-| `GET` | `/courses` | `coursesIndex` | HTML-список курсов; query `q` для поиска |
-| `GET` | `/courses/new` | `newCourse` | Форма создания курса |
-| `POST` | `/courses` | `createCourse` | Создание с валидацией (Yup); редирект на `/courses` или форма с ошибками (422) |
-| `GET` | `/courses/:id/lessons/:postId` | `courseLesson` | `Course ID: {id}; Post ID: {postId}` |
+| `GET` | `/courses` | `coursesIndex` | Список, поиск `?q=`, редактирование/удаление |
+| `GET` | `/courses/new` | `newCourse` | Форма создания |
+| `POST` | `/courses` | `createCourse` | Создание (Yup); редирект или 422 |
+| `GET` | `/courses/:id/lessons/:postId` | `courseLesson` | Текст `Course ID: …; Post ID: …` |
+| `GET` | `/courses/:id/edit` | `editCourse` | Форма редактирования |
+| `PATCH` | `/courses/:id` | `updateCourse` | Обновление (Yup); редирект на просмотр или 422 |
+| `DELETE` | `/courses/:id` | `deleteCourse` | Удаление; редирект на `/courses` |
+| `POST` | `/courses/:id` | — | PATCH/DELETE через `_method` |
+| `GET` | `/courses/:id` | `showCourse` | Просмотр курса; кнопка «Редактировать» |
 
-| `GET` | `/courses?q=массивы` | «JS: Массивы» — подстрока есть в названии |
-| `GET` | `/courses?q=JavaScript` | Оба курса — подстрока есть в описании |
-| `GET` | `/courses?q=python` | Пустой список и сообщение «Курсы не найдены» |
+| `GET` | `/courses?q=массивы` | «JS: Массивы» — подстрока в названии |
+| `GET` | `/courses?q=JavaScript` | Оба курса — подстрока в описании |
+| `GET` | `/courses?q=python` | «Курсы не найдены» |
 
-Данные хранятся в `lib/repositories/coursesRepository.js`. POST-запросы обрабатываются плагином `@fastify/formbody` (`plugins/formbody.js`).
+Данные — `lib/repositories/coursesRepository.js`. Формы — `@fastify/formbody` (`plugins/formbody.js`).
 
-#### Валидация формы (Yup)
+#### Создание (POST)
 
-Перед созданием курса данные проверяются схемой `lib/schemas/createCourseSchema.js`:
+Схема `lib/schemas/createCourseSchema.js`:
 
 | Поле | Правила |
 |------|---------|
 | `title` | обязательное, 2–50 символов, **уникальное** (без учёта регистра и пробелов по краям) |
 | `description` | обязательное, 10–500 символов |
 
-При ошибке валидации обработчик `POST /courses` возвращает статус **422** и снова рендерит `views/courses/new.pug` с объектами `errors` и `values` (введённые название и описание сохраняются в полях формы).
+При ошибке — **422** и `views/courses/new.pug`.
+
+#### Редактирование (PATCH)
+
+Схема `createUpdateCourseSchema(courseId)` в `lib/schemas/updateCourseSchema.js` — те же правила, что при создании; название уникально **кроме** текущего курса.
+
+Шаблоны: `views/courses/show.pug`, `edit.pug`, кнопки в `index.pug`.
 
 ```javascript
 // lib/schemas/createCourseSchema.js
@@ -330,7 +388,7 @@ http://127.0.0.1:3000/test/%3Cscript%3Ealert('attack!')%3B%3C%2Fscript%3E
 npm test
 ```
 
-Тесты лежат в `test/` и проверяют маршруты через `inject()` без поднятия реального HTTP-сервера.
+Тесты лежат в `test/` и проверяют маршруты через `inject()` без поднятия реального HTTP-сервера. Для PATCH и DELETE в тестах используются настоящие HTTP-методы; в браузере — POST с `_method`.
 
 ## Полезные ссылки
 
