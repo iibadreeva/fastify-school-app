@@ -1,4 +1,5 @@
-﻿import { createUserSchema } from '../../lib/schemas/createUserSchema.js'
+﻿import { RouteNames } from '../../lib/RouteNames.js'
+import { createUserSchema } from '../../lib/schemas/createUserSchema.js'
 import {
   createUser,
   findUserById,
@@ -12,21 +13,19 @@ function renderNewUserForm (reply, { errors = {}, values = {} } = {}) {
 }
 
 export default async function (fastify, opts) {
-  fastify.get('/', async function (request, reply) {
+  fastify.get('/', { name: RouteNames.USERS_INDEX }, async function (request, reply) {
     return reply.view('users/index', { users: getAllUsers() })
   })
 
-  // GET /users/new — форма создания (имя маршрута: newUser)
-  fastify.get('/new', { name: 'newUser' }, async function (request, reply) {
+  fastify.get('/new', { name: RouteNames.NEW_USER }, async function (request, reply) {
     return renderNewUserForm(reply)
   })
 
-  // POST /users — валидация Yup → создание или форма с ошибками (422)
-  fastify.post('/', async function (request, reply) {
+  fastify.post('/', { name: RouteNames.CREATE_USER }, async function (request, reply) {
     try {
       const data = await createUserSchema.validate(request.body, {
-        abortEarly: false, // собрать все ошибки сразу, не останавливаться на первой
-        stripUnknown: true, // игнорировать лишние поля из формы
+        abortEarly: false,
+        stripUnknown: true,
       })
 
       createUser({
@@ -35,12 +34,12 @@ export default async function (fastify, opts) {
         password: data.password,
       })
 
-      return reply.redirect('/users')
+      return reply.redirect(fastify.reverse(RouteNames.USERS_INDEX))
     } catch (error) {
       if (error.name === 'ValidationError') {
         return renderNewUserForm(reply.code(422), {
           errors: formatYupErrors(error),
-          values: request.body, // вернуть username и email в поля формы
+          values: request.body,
         })
       }
 
@@ -48,8 +47,7 @@ export default async function (fastify, opts) {
     }
   })
 
-  // маршрут /:id должен быть после /new, иначе "new" воспримется как id
-  fastify.get('/:id', async function (request, reply) {
+  fastify.get('/:id', { name: RouteNames.SHOW_USER }, async function (request, reply) {
     const user = findUserById(request.params.id)
 
     if (!user) {

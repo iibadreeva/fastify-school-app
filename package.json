@@ -48,6 +48,7 @@
     "fastify": "^5.0.0",
     "fastify-cli": "^8.0.0",
     "fastify-plugin": "^5.0.0",
+    "fastify-reverse-routes": "^3.0.0",
     "fastq": "^1.20.1",
     "find-my-way": "^9.6.0",
     "find-up": "^3.0.0",

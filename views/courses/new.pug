@@ -2,7 +2,7 @@ extends ../layout/page
 
 block content
   h1.mb-4 Новый курс
-  form(method="POST" action="/courses" novalidate)
+  form(method="POST" action=reverse(RouteNames.CREATE_COURSE) novalidate)
     .mb-3
       label.form-label(for="title") Название курса
       input.form-control#title(
@@ -26,4 +26,4 @@ block content
       if errors && errors.description
         .invalid-feedback= errors.description
     button.btn.btn-primary(type="submit") Добавить
-    a.btn.btn-secondary.ms-2(href="/courses") Отмена
+    a.btn.btn-secondary.ms-2(href=reverse(RouteNames.COURSES_INDEX)) Отмена

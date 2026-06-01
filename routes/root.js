@@ -1,11 +1,12 @@
 ﻿import sanitizeHtml from 'sanitize-html'
+import { RouteNames } from '../lib/RouteNames.js'
 
 export default async function (fastify, opts) {
-  fastify.get('/', async function (request, reply) {
+  fastify.get('/', { name: RouteNames.HOME }, async function (request, reply) {
     return reply.view('index', { root: true })
   })
   fastify.post('/', async function (request, res) {
-    res.send('POST /users')
+    res.send(`POST ${fastify.reverse(RouteNames.USERS_INDEX)}`)
   })
 
   const data = {
@@ -16,7 +17,7 @@ export default async function (fastify, opts) {
     res.send(data.phones)
   })
 
-  fastify.get('/test', (req, res) => {
+  fastify.get('/test', { name: RouteNames.TEST }, (req, res) => {
     // test?name=inna
     const { name } = req.query;
     if(!name){

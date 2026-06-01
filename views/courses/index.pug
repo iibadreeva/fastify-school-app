@@ -1,8 +1,8 @@
 ﻿extends ../layout/page
 block content
     h1= header
-    a.btn.btn-primary.mb-4(href="/courses/new") Новый курс
-    form.mb-4(method="GET" action="/courses")
+    a.btn.btn-primary.mb-4(href=reverse(RouteNames.NEW_COURSE)) Новый курс
+    form.mb-4(method="GET" action=reverse(RouteNames.COURSES_INDEX))
         .input-group
             input.form-control(
                 type="search"
@@ -20,5 +20,5 @@ block content
         each course in courses
             div
                 h2
-                    a(href=`/courses/${course.id}/lessons/1`)= course.title
+                    a(href=reverse(RouteNames.COURSE_LESSON, { id: course.id, postId: 1 }))= course.title
                 p= course.description

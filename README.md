@@ -40,11 +40,13 @@ fastify-school-app/
 │   ├── support.js      # Пример кастомного декоратора
 │   ├── view.js         # Шаблонизатор Pug (@fastify/view)
 │   ├── formbody.js     # Парсинг HTML-форм (@fastify/formbody)
+│   ├── reverse-routes.js # Именованные URL (fastify.reverse)
 │   └── static.js       # Bootstrap CSS (/assets/)
 ├── lib/
 │   ├── getUsers.js     # Начальные данные пользователей (@faker-js/faker)
 │   ├── normalizeEmail.js
 │   ├── hashPassword.js
+│   ├── RouteNames.js   # Константы имён маршрутов (для fastify.reverse)
 │   ├── schemas/
 │   │   ├── createUserSchema.js   # Yup-схема валидации пользователя
 │   │   └── createCourseSchema.js # Yup-схема валидации курса
@@ -99,24 +101,45 @@ fastify-school-app/
 | `routes/users/index.js` | `/users` | `GET /users` |
 | `routes/courses/index.js` | `/courses` | `GET /courses` |
 
+### Именованные маршруты (fastify-reverse-routes)
+
+Плагин `plugins/reverse-routes.js` реализует API [fastify-reverse-routes](https://github.com/dimonnwc3/fastify-reverse-routes): декоратор `fastify.reverse(name, params)` строит URL по имени маршрута. Имена собраны в классе `lib/RouteNames.js`.
+
+В обработчиках:
+
+```javascript
+import { RouteNames } from '../../lib/RouteNames.js'
+
+return reply.redirect(fastify.reverse(RouteNames.USERS_INDEX))
+```
+
+В Pug-шаблонах (через `defaultContext` в `plugins/view.js`):
+
+```pug
+a(href=reverse(RouteNames.NEW_USER)) Новый пользователь
+a(href=reverse(RouteNames.SHOW_USER, { id: user.id }))= user.username
+```
+
+Префиксы URL задаёт autoload по имени папки (`routes/users` → `/users`, `routes/courses` → `/courses`). Менять путь можно, переименовав папку — ссылки в шаблонах и редиректах обновятся автоматически.
+
 ### Маршруты в корне (`routes/root.js`)
 
 | Метод | URL | Ответ |
 |-------|-----|--------|
 | `GET` | `/` | HTML-страница (`views/index.pug`) |
-| `POST` | `/` | `POST /users` |
+| `POST` | `/` | `POST /users` (через `fastify.reverse`) |
 | `GET` | `/phones` | JSON-массив телефонов |
 | `GET` | `/test` | `Hello World!` или `Hello {name}!` (query-параметр `name`) |
 | `GET` | `/test/:id` | HTML-страница с заголовком; параметр `:id` проходит через `sanitize-html` |
 
 ### Пользователи (`routes/users/index.js`)
 
-| Метод | URL | Ответ |
-|-------|-----|--------|
-| `GET` | `/users` | Таблица пользователей (`views/users/index.pug`) |
-| `GET` | `/users/new` | Форма создания пользователя (`views/users/new.pug`, имя маршрута `newUser`) |
-| `POST` | `/users` | Создание пользователя с валидацией (Yup); при успехе — редирект на `/users`, при ошибке — форма с сообщениями (422) |
-| `GET` | `/users/:id` | Карточка пользователя или `404` с текстом `User not found` |
+| Метод | URL | Имя маршрута | Ответ |
+|-------|-----|--------------|--------|
+| `GET` | `/users` | `usersIndex` | Таблица пользователей (`views/users/index.pug`) |
+| `GET` | `/users/new` | `newUser` | Форма создания пользователя |
+| `POST` | `/users` | `createUser` | Создание с валидацией (Yup); редирект на `/users` или форма с ошибками (422) |
+| `GET` | `/users/:id` | `showUser` | Карточка пользователя или `404` |
 
 Данные хранятся в `lib/repositories/usersRepository.js`. Начальный список генерируется через `lib/getUsers.js` (100 пользователей, фиксированный seed). При создании email нормализуется через `lib/normalizeEmail.js` (trim + lowercase), пароль хешируется через `lib/hashPassword.js`.
 
@@ -157,7 +180,7 @@ try {
     stripUnknown: true,
   })
   createUser({ username: data.username, email: data.email, password: data.password })
-  return reply.redirect('/users')
+  return reply.redirect(fastify.reverse(RouteNames.USERS_INDEX))
 } catch (error) {
   if (error.name === 'ValidationError') {
     return reply.code(422).view('users/new', {
@@ -178,18 +201,18 @@ export default function normalizeEmail (email) {
 
 ### Курсы (`routes/courses/index.js`, `views/courses/index.pug`)
 
-| Метод | URL | Ответ |
-|-------|-----|--------|
-| `GET` | `/courses` | HTML-список курсов; опциональный query-параметр `q` для поиска |
-| `GET` | `/courses/new` | Форма создания курса (`views/courses/new.pug`, имя маршрута `newCourse`) |
-| `POST` | `/courses` | Создание курса с валидацией (Yup); при успехе — редирект на `/courses`, при ошибке — форма с сообщениями (422) |
-| `GET` | `/courses/:id/lessons/:postId` | `Course ID: {id}; Post ID: {postId}` (plain text) |
+| Метод | URL | Имя маршрута | Ответ |
+|-------|-----|--------------|--------|
+| `GET` | `/courses` | `coursesIndex` | HTML-список курсов; query `q` для поиска |
+| `GET` | `/courses/new` | `newCourse` | Форма создания курса |
+| `POST` | `/courses` | `createCourse` | Создание с валидацией (Yup); редирект на `/courses` или форма с ошибками (422) |
+| `GET` | `/courses/:id/lessons/:postId` | `courseLesson` | `Course ID: {id}; Post ID: {postId}` |
 
 | `GET` | `/courses?q=массивы` | «JS: Массивы» — подстрока есть в названии |
 | `GET` | `/courses?q=JavaScript` | Оба курса — подстрока есть в описании |
 | `GET` | `/courses?q=python` | Пустой список и сообщение «Курсы не найдены» |
 
-Данные хранятся в `lib/repositories/coursesRepository.js`. Поиск и добавление курсов работают через формы на странице `/courses`. POST-запросы обрабатываются благодаря плагину `@fastify/formbody` (`plugins/formbody.js`).
+Данные хранятся в `lib/repositories/coursesRepository.js`. POST-запросы обрабатываются плагином `@fastify/formbody` (`plugins/formbody.js`).
 
 #### Валидация формы (Yup)
 
@@ -231,7 +254,7 @@ try {
     stripUnknown: true,
   })
   createCourse({ title: data.title, description: data.description })
-  return reply.redirect('/courses')
+  return reply.redirect(fastify.reverse(RouteNames.COURSES_INDEX))
 } catch (error) {
   if (error.name === 'ValidationError') {
     return renderNewCourseForm(reply.code(422), {
@@ -253,8 +276,8 @@ try {
 
 **Когда что использовать:**
 
-- **`routes/имя.js`** — эндпоинты без общего префикса (главная, `/courses`, `/test` и т.п.).
-- **`routes/имя/index.js`** — логическая группа под одним префиксом (`/demo`, `/users`). В папку можно добавлять другие файлы, не раздувая один большой модуль.
+- **`routes/имя.js`** — эндпоинты без общего префикса (главная, `/test` и т.п.).
+- **`routes/имя/index.js`** — логическая группа под одним префиксом (`/demo`, `/users`, `/courses`). В папку можно добавлять другие файлы, не раздувая один большой модуль.
 
 Подробнее о соглашениях — в [routes/README.md](routes/README.md).
 
@@ -315,7 +338,8 @@ npm test
 
 - [Документация Fastify](https://fastify.dev/docs/latest/)
 - [Маршруты](https://fastify.dev/docs/latest/Reference/Routes/)
-- [Именованные маршруты](https://fastify.dev/docs/latest/Reference/Routes/#route-options) (`name: 'newUser'`)
+- [Именованные маршруты](https://fastify.dev/docs/latest/Reference/Routes/#route-options) (`name: RouteNames.NEW_USER`)
+- [fastify-reverse-routes](https://github.com/dimonnwc3/fastify-reverse-routes) — генерация URL по имени маршрута
 - [Плагины](https://fastify.dev/docs/latest/Reference/Plugins/)
 - [@fastify/autoload](https://github.com/fastify/fastify-autoload) — автозагрузка `routes/` и `plugins/`
 - [@fastify/formbody](https://github.com/fastify/fastify-formbody) — парсинг HTML-форм

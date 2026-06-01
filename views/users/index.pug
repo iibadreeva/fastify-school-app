@@ -2,7 +2,7 @@
 
 block content
   h1.mb-4 Пользователи
-  a.btn.btn-primary.mb-4(href="/users/new") Новый пользователь
+  a.btn.btn-primary.mb-4(href=reverse(RouteNames.NEW_USER)) Новый пользователь
   table.table.table-striped.table-hover
     thead
       tr
@@ -13,6 +13,6 @@ block content
       each user in users
         tr
           td
-            a(href=`/users/${user.id}`)= user.username
+            a(href=reverse(RouteNames.SHOW_USER, { id: user.id }))= user.username
           td= user.email
           td= user.password

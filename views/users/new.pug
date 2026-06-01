@@ -3,7 +3,7 @@ extends ../layout/page
 block content
   h1.mb-4 Новый пользователь
   //- novalidate — показываем ошибки Yup с сервера, а не браузерные подсказки
-  form(method="POST" action="/users" novalidate)
+  form(method="POST" action=reverse(RouteNames.CREATE_USER) novalidate)
     .mb-3
       label.form-label(for="username") Имя пользователя
       //- values — данные при повторном показе формы после 422
@@ -49,4 +49,4 @@ block content
       if errors && errors.passwordConfirm
         .invalid-feedback= errors.passwordConfirm
     button.btn.btn-primary(type="submit") Добавить
-    a.btn.btn-secondary.ms-2(href="/users") Отмена
+    a.btn.btn-secondary.ms-2(href=reverse(RouteNames.USERS_INDEX)) Отмена

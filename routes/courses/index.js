@@ -1,4 +1,5 @@
-﻿import {
+﻿import { RouteNames } from '../../lib/RouteNames.js'
+import {
   createCourse,
   getAllCourses,
 } from '../../lib/repositories/coursesRepository.js'
@@ -10,7 +11,7 @@ function renderNewCourseForm (reply, { errors = {}, values = {} } = {}) {
 }
 
 export default async function (fastify, opts) {
-  fastify.get('/', async function (request, reply) {
+  fastify.get('/', { name: RouteNames.COURSES_INDEX }, async function (request, reply) {
     const { q = '' } = request.query
     const filterQuery = q.trim()
     const query = filterQuery.toLowerCase()
@@ -28,23 +29,23 @@ export default async function (fastify, opts) {
     })
   })
 
-  fastify.get('/new', { name: 'newCourse' }, async function (request, reply) {
+  fastify.get('/new', { name: RouteNames.NEW_COURSE }, async function (request, reply) {
     return renderNewCourseForm(reply)
   })
 
-  fastify.post('/', async function (request, reply) {
+  fastify.post('/', { name: RouteNames.CREATE_COURSE }, async function (request, reply) {
     try {
       const data = await createCourseSchema.validate(request.body, {
-        abortEarly: false, // собрать все ошибки сразу, не останавливаться на первой
-        stripUnknown: true, // игнорировать лишние поля из формы
+        abortEarly: false,
+        stripUnknown: true,
       })
 
       createCourse({
         title: data.title,
-        description: data.description
+        description: data.description,
       })
 
-      return reply.redirect('/courses')
+      return reply.redirect(fastify.reverse(RouteNames.COURSES_INDEX))
     } catch (error) {
       if (error.name === 'ValidationError') {
         return renderNewCourseForm(reply.code(422), {
@@ -57,7 +58,7 @@ export default async function (fastify, opts) {
     }
   })
 
-  fastify.get('/:id/lessons/:postId', async function (request, reply) {
+  fastify.get('/:id/lessons/:postId', { name: RouteNames.COURSE_LESSON }, async function (request, reply) {
     const { id, postId } = request.params
 
     return reply.send(`Course ID: ${id}; Post ID: ${postId}`)

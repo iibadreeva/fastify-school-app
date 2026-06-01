@@ -54,7 +54,7 @@ test('undefined user', async (t) => {
 
   const res = await app.inject({
     method: 'GET',
-    url: '/users/undefined'
+    url: '/users/usersndefined'
   })
 
   assert.equal(res.statusCode, 404)
