@@ -44,6 +44,12 @@ fastify-school-app/
 ├── lib/
 │   ├── getUsers.js     # Начальные данные пользователей (@faker-js/faker)
 │   ├── normalizeEmail.js
+│   ├── hashPassword.js
+│   ├── schemas/
+│   │   ├── createUserSchema.js   # Yup-схема валидации пользователя
+│   │   └── createCourseSchema.js # Yup-схема валидации курса
+│   ├── validation/
+│   │   └── formatYupErrors.js   # Преобразование ошибок Yup для шаблона
 │   └── repositories/
 │       ├── usersRepository.js   # In-memory хранилище пользователей
 │       └── coursesRepository.js # In-memory хранилище курсов
@@ -67,7 +73,10 @@ fastify-school-app/
 └── test/               # Тесты
     ├── helper.js
     ├── lib/
-    │   └── normalizeEmail.test.js
+    │   ├── normalizeEmail.test.js
+    │   ├── hashPassword.test.js
+    │   ├── createUserSchema.test.js
+    │   └── createCourseSchema.test.js
     ├── plugins/
     │   └── support.test.js
     └── routes/
@@ -106,10 +115,58 @@ fastify-school-app/
 |-------|-----|--------|
 | `GET` | `/users` | Таблица пользователей (`views/users/index.pug`) |
 | `GET` | `/users/new` | Форма создания пользователя (`views/users/new.pug`, имя маршрута `newUser`) |
-| `POST` | `/users` | Создание пользователя, редирект на `/users` |
+| `POST` | `/users` | Создание пользователя с валидацией (Yup); при успехе — редирект на `/users`, при ошибке — форма с сообщениями (422) |
 | `GET` | `/users/:id` | Карточка пользователя или `404` с текстом `User not found` |
 
-Данные хранятся в `lib/repositories/usersRepository.js`. Начальный список генерируется через `lib/getUsers.js` (100 пользователей, фиксированный seed). При создании email нормализуется через `lib/normalizeEmail.js` (trim + lowercase).
+Данные хранятся в `lib/repositories/usersRepository.js`. Начальный список генерируется через `lib/getUsers.js` (100 пользователей, фиксированный seed). При создании email нормализуется через `lib/normalizeEmail.js` (trim + lowercase), пароль хешируется через `lib/hashPassword.js`.
+
+#### Валидация формы (Yup)
+
+Перед созданием пользователя данные проверяются схемой `lib/schemas/createUserSchema.js`:
+
+| Поле | Правила |
+|------|---------|
+| `username` | обязательное, 2–50 символов |
+| `email` | обязательный, корректный email |
+| `password` | обязательный, минимум 6 символов |
+| `passwordConfirm` | обязательный, должен совпадать с `password` |
+
+При ошибке валидации обработчик `POST /users` возвращает статус **422** и снова рендерит `views/users/new.pug` с объектами `errors` и `values` (имя и email сохраняются в полях, пароли не подставляются).
+
+```javascript
+// lib/schemas/createUserSchema.js
+import * as yup from 'yup'
+
+export const createUserSchema = yup.object({
+  username: yup.string().trim().required('Введите имя пользователя').min(2).max(50),
+  email: yup.string().trim().required('Введите email').email('Введите корректный email'),
+  password: yup.string().required('Введите пароль').min(6, 'Пароль должен содержать минимум 6 символов'),
+  passwordConfirm: yup
+    .string()
+    .required('Подтвердите пароль')
+    .oneOf([yup.ref('password')], 'Пароли не совпадают'),
+})
+```
+
+```javascript
+// routes/users/index.js
+try {
+  const data = await createUserSchema.validate(request.body, {
+    abortEarly: false,
+    stripUnknown: true,
+  })
+  createUser({ username: data.username, email: data.email, password: data.password })
+  return reply.redirect('/users')
+} catch (error) {
+  if (error.name === 'ValidationError') {
+    return reply.code(422).view('users/new', {
+      errors: formatYupErrors(error),
+      values: request.body,
+    })
+  }
+  throw error
+}
+```
 
 ```javascript
 // lib/normalizeEmail.js
@@ -118,13 +175,13 @@ export default function normalizeEmail (email) {
 }
 ```
 
-### Курсы (`routes/courses/index.js`, `views/curses.pug`)
+### Курсы (`routes/courses/index.js`, `views/courses/index.pug`)
 
 | Метод | URL | Ответ |
 |-------|-----|--------|
 | `GET` | `/courses` | HTML-список курсов; опциональный query-параметр `q` для поиска |
 | `GET` | `/courses/new` | Форма создания курса (`views/courses/new.pug`, имя маршрута `newCourse`) |
-| `POST` | `/courses` | Создание курса, редирект на `/courses` |
+| `POST` | `/courses` | Создание курса с валидацией (Yup); при успехе — редирект на `/courses`, при ошибке — форма с сообщениями (422) |
 | `GET` | `/courses/:id/lessons/:postId` | `Course ID: {id}; Post ID: {postId}` (plain text) |
 
 | `GET` | `/courses?q=массивы` | «JS: Массивы» — подстрока есть в названии |
@@ -133,30 +190,55 @@ export default function normalizeEmail (email) {
 
 Данные хранятся в `lib/repositories/coursesRepository.js`. Поиск и добавление курсов работают через формы на странице `/courses`. POST-запросы обрабатываются благодаря плагину `@fastify/formbody` (`plugins/formbody.js`).
 
-```javascript
-// routes/users/index.js
-fastify.get('/new', { name: 'newUser' }, async function (request, reply) {
-  return reply.view('users/new')
-})
+#### Валидация формы (Yup)
 
-fastify.post('/', async function (request, reply) {
-  const { username, email } = request.body
-  createUser({ username, email })
-  return reply.redirect('/users')
+Перед созданием курса данные проверяются схемой `lib/schemas/createCourseSchema.js`:
+
+| Поле | Правила |
+|------|---------|
+| `title` | обязательное, 2–50 символов |
+| `description` | обязательное, 10–500 символов |
+
+При ошибке валидации обработчик `POST /courses` возвращает статус **422** и снова рендерит `views/courses/new.pug` с объектами `errors` и `values` (введённые название и описание сохраняются в полях формы).
+
+```javascript
+// lib/schemas/createCourseSchema.js
+import * as yup from 'yup'
+
+export const createCourseSchema = yup.object({
+  title: yup
+    .string()
+    .trim()
+    .required('Введите название курса')
+    .min(2, 'Название курса должно содержать минимум 2 символа')
+    .max(50, 'Название курса не должно превышать 50 символов'),
+  description: yup
+    .string()
+    .trim()
+    .required('Введите описание курса')
+    .min(10, 'Описание курса должно содержать минимум 10 символов')
+    .max(500, 'Описание курса не должно превышать 500 символов'),
 })
 ```
 
 ```javascript
 // routes/courses/index.js
-fastify.get('/new', { name: 'newCourse' }, async function (request, reply) {
-  return reply.view('courses/new')
-})
-
-fastify.post('/', async function (request, reply) {
-  const { title, description } = request.body
-  createCourse({ title, description })
+try {
+  const data = await createCourseSchema.validate(request.body, {
+    abortEarly: false,
+    stripUnknown: true,
+  })
+  createCourse({ title: data.title, description: data.description })
   return reply.redirect('/courses')
-})
+} catch (error) {
+  if (error.name === 'ValidationError') {
+    return renderNewCourseForm(reply.code(422), {
+      errors: formatYupErrors(error),
+      values: request.body,
+    })
+  }
+  throw error
+}
 ```
 
 ### HTML через Pug (`routes/demo/index.js`)
@@ -180,7 +262,7 @@ fastify.post('/', async function (request, reply) {
 
 ### 1. Автоэкранирование в Pug
 
-Оператор `=` в шаблонах превращает `<script>` в безопасный текст (`&lt;script&gt;`). Например, в `views/curses.pug`:
+Оператор `=` в шаблонах превращает `<script>` в безопасный текст (`&lt;script&gt;`). Например, в `views/courses/index.pug`:
 
 ```pug
 h1= header
@@ -227,7 +309,35 @@ npm test
 
 ## Полезные ссылки
 
+### Fastify
+
 - [Документация Fastify](https://fastify.dev/docs/latest/)
-- [Плагины Fastify](https://fastify.dev/docs/latest/Reference/Plugins/)
-- [Маршруты и Promise](https://fastify.dev/docs/latest/Reference/Routes/#promise-resolution)
-- [Pug — синтаксис шаблонов](https://pugjs.org/api/getting-started.html)
+- [Маршруты](https://fastify.dev/docs/latest/Reference/Routes/)
+- [Именованные маршруты](https://fastify.dev/docs/latest/Reference/Routes/#route-options) (`name: 'newUser'`)
+- [Плагины](https://fastify.dev/docs/latest/Reference/Plugins/)
+- [@fastify/autoload](https://github.com/fastify/fastify-autoload) — автозагрузка `routes/` и `plugins/`
+- [@fastify/formbody](https://github.com/fastify/fastify-formbody) — парсинг HTML-форм
+- [@fastify/view](https://github.com/fastify/point-of-view) — шаблонизатор Pug
+- [@fastify/static](https://github.com/fastify/fastify-static) — статические файлы (`/assets/`)
+- [@fastify/sensible](https://github.com/fastify/fastify-sensible) — HTTP-ошибки
+- [Тестирование через `inject()`](https://fastify.dev/docs/latest/Guides/Testing/)
+
+### Шаблоны и UI
+
+- [Pug — синтаксис](https://pugjs.org/api/getting-started.html)
+- [Bootstrap 5](https://getbootstrap.com/docs/5.3/getting-started/introduction/)
+
+### Валидация и данные
+
+- [Yup — схемы валидации](https://github.com/jquense/yup)
+- [Faker.js](https://fakerjs.dev/) — генерация тестовых пользователей
+- [crypto-js](https://github.com/brix/crypto-js) — хеширование паролей (учебный пример)
+
+### Безопасность
+
+- [sanitize-html](https://www.npmjs.com/package/sanitize-html) — очистка HTML в `GET /test/:id`
+
+### Node.js
+
+- [Встроенный тест-раннер `node:test`](https://nodejs.org/api/test.html)
+- [Fastify CLI](https://www.npmjs.com/package/fastify-cli)

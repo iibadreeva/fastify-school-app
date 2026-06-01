@@ -2,12 +2,28 @@ extends ../layout/page
 
 block content
   h1.mb-4 Новый курс
-  form(method="POST" action="/courses")
+  form(method="POST" action="/courses" novalidate)
     .mb-3
       label.form-label(for="title") Название курса
-      input.form-control#title(type="text" name="title" required)
+      input.form-control#title(
+        type="text"
+        name="title"
+        value=values && values.title ? values.title : ''
+        class=(errors && errors.title) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.title
+        .invalid-feedback= errors.title
     .mb-3
       label.form-label(for="description") Описание курса
-      input.form-control#description(type="text" name="description" required)
+      input.form-control#description(
+        type="text"
+        name="description"
+        value=values && values.description ? values.description : ''
+        class=(errors && errors.description) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.description
+        .invalid-feedback= errors.description
     button.btn.btn-primary(type="submit") Добавить
     a.btn.btn-secondary.ms-2(href="/courses") Отмена

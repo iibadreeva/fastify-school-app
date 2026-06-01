@@ -2,6 +2,12 @@
   createCourse,
   getAllCourses,
 } from '../../lib/repositories/coursesRepository.js'
+import { formatYupErrors } from '../../lib/validation/formatYupErrors.js'
+import { createCourseSchema } from '../../lib/schemas/createCourseSchema.js'
+
+function renderNewCourseForm (reply, { errors = {}, values = {} } = {}) {
+  return reply.view('courses/new', { errors, values })
+}
 
 export default async function (fastify, opts) {
   fastify.get('/', async function (request, reply) {
@@ -23,15 +29,32 @@ export default async function (fastify, opts) {
   })
 
   fastify.get('/new', { name: 'newCourse' }, async function (request, reply) {
-    return reply.view('courses/new')
+    return renderNewCourseForm(reply)
   })
 
   fastify.post('/', async function (request, reply) {
-    const { title, description } = request.body
+    try {
+      const data = await createCourseSchema.validate(request.body, {
+        abortEarly: false, // собрать все ошибки сразу, не останавливаться на первой
+        stripUnknown: true, // игнорировать лишние поля из формы
+      })
 
-    createCourse({ title, description })
+      createCourse({
+        title: data.title,
+        description: data.description
+      })
 
-    return reply.redirect('/courses')
+      return reply.redirect('/courses')
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        return renderNewCourseForm(reply.code(422), {
+          errors: formatYupErrors(error),
+          values: request.body,
+        })
+      }
+
+      throw error
+    }
   })
 
   fastify.get('/:id/lessons/:postId', async function (request, reply) {

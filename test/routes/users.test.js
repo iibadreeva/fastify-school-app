@@ -37,7 +37,7 @@ test('new user form', async (t) => {
 
 test('get user', async (t) => {
   const app = await build(t)
-  const userIndex = 75
+  const userIndex = 5
 
   const res = await app.inject({
     method: 'GET',
@@ -84,4 +84,23 @@ test('create user redirects to users list and normalizes email', async (t) => {
   assert.equal(list.statusCode, 200)
   assert.match(list.payload, /New User/)
   assert.match(list.payload, /test@example.com/)
+})
+
+test('create user validation errors are shown on form', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/users',
+    payload: 'username=a&email=bad&password=123&passwordConfirm=456',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+  })
+
+  assert.equal(res.statusCode, 422)
+  assert.match(res.payload, /Введите корректный email/)
+  assert.match(res.payload, /Пароли не совпадают/)
+  assert.match(res.payload, /value="a"/)
+  assert.match(res.payload, /value="bad"/)
 })

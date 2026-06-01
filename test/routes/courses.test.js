@@ -115,6 +115,25 @@ test('courses search preserves query in form', async (t) => {
   assert.match(res.payload, /value="массивы"/)
 })
 
+test('create course validation errors are shown on form', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/courses',
+    payload: 'title=a&description=short',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+  })
+
+  assert.equal(res.statusCode, 422)
+  assert.match(res.payload, /минимум 2 символа/)
+  assert.match(res.payload, /минимум 10 символов/)
+  assert.match(res.payload, /value="a"/)
+  assert.match(res.payload, /value="short"/)
+})
+
 test('create course redirects to courses list', async (t) => {
   const app = await build(t)
 
