@@ -127,7 +127,7 @@ fastify-school-app/
 | Поле | Правила |
 |------|---------|
 | `username` | обязательное, 2–50 символов |
-| `email` | обязательный, корректный email |
+| `email` | обязательный, корректный email, **уникальный** (без учёта регистра) |
 | `password` | обязательный, минимум 6 символов |
 | `passwordConfirm` | обязательный, должен совпадать с `password` |
 
@@ -139,7 +139,8 @@ import * as yup from 'yup'
 
 export const createUserSchema = yup.object({
   username: yup.string().trim().required('Введите имя пользователя').min(2).max(50),
-  email: yup.string().trim().required('Введите email').email('Введите корректный email'),
+  email: yup.string().trim().required('Введите email').email('Введите корректный email')
+    .test('unique-email', 'Пользователь с таким email уже существует', (value) => !value || !isEmailTaken(value)),
   password: yup.string().required('Введите пароль').min(6, 'Пароль должен содержать минимум 6 символов'),
   passwordConfirm: yup
     .string()
@@ -196,7 +197,7 @@ export default function normalizeEmail (email) {
 
 | Поле | Правила |
 |------|---------|
-| `title` | обязательное, 2–50 символов |
+| `title` | обязательное, 2–50 символов, **уникальное** (без учёта регистра и пробелов по краям) |
 | `description` | обязательное, 10–500 символов |
 
 При ошибке валидации обработчик `POST /courses` возвращает статус **422** и снова рендерит `views/courses/new.pug` с объектами `errors` и `values` (введённые название и описание сохраняются в полях формы).
@@ -211,7 +212,8 @@ export const createCourseSchema = yup.object({
     .trim()
     .required('Введите название курса')
     .min(2, 'Название курса должно содержать минимум 2 символа')
-    .max(50, 'Название курса не должно превышать 50 символов'),
+    .max(50, 'Название курса не должно превышать 50 символов')
+    .test('unique-title', 'Курс с таким названием уже существует', (value) => !value || !isCourseTitleTaken(value)),
   description: yup
     .string()
     .trim()

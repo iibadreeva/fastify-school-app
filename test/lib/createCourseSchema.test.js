@@ -12,6 +12,16 @@ test('createCourseSchema accepts valid data', async () => {
   assert.equal(data.description, 'Курс про объекты в JavaScript')
 })
 
+test('createCourseSchema rejects duplicate title', async () => {
+  await assert.rejects(
+    () => createCourseSchema.validate({
+      title: 'js: массивы',
+      description: 'Другое описание курса про массивы',
+    }, { abortEarly: false }),
+    /уже существует/i
+  )
+})
+
 test('createCourseSchema rejects short title', async () => {
   await assert.rejects(
     () => createCourseSchema.validate({

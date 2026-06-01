@@ -115,6 +115,23 @@ test('courses search preserves query in form', async (t) => {
   assert.match(res.payload, /value="массивы"/)
 })
 
+test('create course rejects duplicate title', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/courses',
+    payload: 'title=js%3A+%D0%BC%D0%B0%D1%81%D1%81%D0%B8%D0%B2%D1%8B&description=Другое+описание+курса+про+массивы+в+JS',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+  })
+
+  assert.equal(res.statusCode, 422)
+  assert.match(res.payload, /уже существует/)
+  assert.match(res.payload, /value="js: массивы"/)
+})
+
 test('create course validation errors are shown on form', async (t) => {
   const app = await build(t)
 

@@ -86,6 +86,23 @@ test('create user redirects to users list and normalizes email', async (t) => {
   assert.match(list.payload, /test@example.com/)
 })
 
+test('create user rejects duplicate email', async (t) => {
+  const app = await build(t)
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/users',
+    payload: `username=Duplicate&email=${encodeURIComponent(users[0].email.toUpperCase())}&password=secret12&passwordConfirm=secret12`,
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+  })
+
+  assert.equal(res.statusCode, 422)
+  assert.match(res.payload, /уже существует/)
+  assert.match(res.payload, /value="Duplicate"/)
+})
+
 test('create user validation errors are shown on form', async (t) => {
   const app = await build(t)
 
