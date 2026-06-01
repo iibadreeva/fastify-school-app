@@ -47,6 +47,9 @@ fastify-school-app/
 │   ├── normalizeEmail.js
 │   ├── hashPassword.js
 │   ├── RouteNames.js   # Константы имён маршрутов (для fastify.reverse)
+│   ├── controllers/
+│   │   ├── usersController.js   # Обработчики HTTP для /users
+│   │   └── coursesController.js # Обработчики HTTP для /courses
 │   ├── schemas/
 │   │   ├── createUserSchema.js   # Yup: создание пользователя
 │   │   ├── updateUserSchema.js   # Yup: редактирование (PATCH)
@@ -160,13 +163,16 @@ form(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }))
 | `GET` | `/test` | `Hello World!` или `Hello {name}!` (query-параметр `name`) |
 | `GET` | `/test/:id` | HTML-страница с заголовком; параметр `:id` проходит через `sanitize-html` |
 
-### Пользователи (`routes/users/index.js`)
+### Пользователи
+
+**Роутинг:** `routes/users/index.js` — только привязка URL к обработчикам.  
+**Логика:** `lib/controllers/usersController.js` — index, create, show, editForm, update, destroy.
 
 Порядок регистрации маршрутов важен: `/new` и `/:id/edit` — **до** `/:id`.
 
 | Метод | URL | Имя маршрута | Ответ |
 |-------|-----|--------------|--------|
-| `GET` | `/users` | `usersIndex` | Таблица; ссылки редактирования/удаления |
+| `GET` | `/users` | `usersIndex` | Таблица (10 записей на страницу, `?page=2`); «Назад» / «Вперёд» |
 | `GET` | `/users/new` | `newUser` | Форма создания |
 | `POST` | `/users` | `createUser` | Создание (Yup); редирект на `/users` или 422 |
 | `GET` | `/users/:id/edit` | `editUser` | Форма редактирования |
@@ -175,7 +181,7 @@ form(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }))
 | `POST` | `/users/:id` | — | То же, что PATCH/DELETE при `_method` в форме |
 | `GET` | `/users/:id` | `showUser` | Карточка; кнопка «Редактировать» |
 
-Данные — `lib/repositories/usersRepository.js` (in-memory). Стартовые пользователи: `lib/getUsers.js` (seed). Email нормализуется (`lib/normalizeEmail.js`), пароль хешируется (`lib/hashPassword.js`).
+Данные — `lib/repositories/usersRepository.js` (in-memory). Стартовые пользователи: `lib/getUsers.js` (25 записей, фиксированный seed). Список: `getUsersPage(page)` — по 10 пользователей, query-параметр `page` (с 1). Email нормализуется (`lib/normalizeEmail.js`), пароль хешируется (`lib/hashPassword.js`).
 
 #### Создание (POST)
 
@@ -220,23 +226,11 @@ export const createUserSchema = yup.object({
 ```
 
 ```javascript
-// routes/users/index.js
-try {
-  const data = await createUserSchema.validate(request.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  })
-  createUser({ username: data.username, email: data.email, password: data.password })
-  return reply.redirect(fastify.reverse(RouteNames.USERS_INDEX))
-} catch (error) {
-  if (error.name === 'ValidationError') {
-    return reply.code(422).view('users/new', {
-      errors: formatYupErrors(error),
-      values: request.body,
-    })
-  }
-  throw error
-}
+// routes/users/index.js — только регистрация
+import * as usersController from '../../lib/controllers/usersController.js'
+
+fastify.post('/', { name: RouteNames.CREATE_USER }, usersController.create)
+fastify.patch('/:id', { name: RouteNames.UPDATE_USER }, usersController.update)
 ```
 
 ```javascript
@@ -246,7 +240,10 @@ export default function normalizeEmail (email) {
 }
 ```
 
-### Курсы (`routes/courses/index.js`)
+### Курсы
+
+**Роутинг:** `routes/courses/index.js`  
+**Логика:** `lib/controllers/coursesController.js`
 
 | Метод | URL | Имя маршрута | Ответ |
 |-------|-----|--------------|--------|

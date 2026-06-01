@@ -19,6 +19,34 @@ test('users index', async (t) => {
   assert.match(res.payload, /Новый пользователь/)
 })
 
+test('users index paginates 10 per page', async (t) => {
+  const app = await build(t)
+
+  const page1 = await app.inject({ method: 'GET', url: '/users' })
+  assert.equal(page1.statusCode, 200)
+  assert.match(page1.payload, /Страница 1 из/)
+  assert.match(page1.payload, new RegExp(users[0].username))
+  assert.match(page1.payload, new RegExp(users[9].username))
+  assert.doesNotMatch(page1.payload, new RegExp(users[10].username))
+  assert.match(page1.payload, /href="\/users\?page=2">Вперёд/)
+  assert.match(page1.payload, /disabled">← Назад/)
+  assert.doesNotMatch(page1.payload, /href="[^"]*">← Назад/)
+
+  const page2 = await app.inject({ method: 'GET', url: '/users?page=2' })
+  assert.equal(page2.statusCode, 200)
+  assert.match(page2.payload, /Страница 2 из/)
+  assert.match(page2.payload, new RegExp(users[10].username))
+  assert.doesNotMatch(page2.payload, new RegExp(users[0].username))
+  assert.match(page2.payload, /← Назад/)
+  assert.match(page2.payload, /Вперёд/)
+
+  const page3 = await app.inject({ method: 'GET', url: '/users?page=3' })
+  assert.equal(page3.statusCode, 200)
+  assert.match(page3.payload, new RegExp(users[20].username))
+  assert.match(page3.payload, /disabled">Вперёд →/)
+  assert.doesNotMatch(page3.payload, /href="[^"]*">Вперёд →/)
+})
+
 test('new user form', async (t) => {
   const app = await build(t)
 
@@ -78,7 +106,7 @@ test('create user redirects to users list and normalizes email', async (t) => {
 
   const list = await app.inject({
     method: 'GET',
-    url: '/users',
+    url: '/users?page=3',
   })
 
   assert.equal(list.statusCode, 200)
@@ -130,7 +158,7 @@ test('patch user updates and redirects to show', async (t) => {
   })
   assert.equal(createRes.statusCode, 302)
 
-  const list = await app.inject({ method: 'GET', url: '/users' })
+  const list = await app.inject({ method: 'GET', url: '/users?page=3' })
   const idMatch = list.payload.match(/href="\/users\/([0-9a-f-]+)"[^>]*>\s*Patch Me/)
   assert.ok(idMatch, 'user id not found in list')
   const id = idMatch[1]
@@ -161,7 +189,7 @@ test('delete user removes from list', async (t) => {
   })
   assert.equal(createRes.statusCode, 302)
 
-  const listBefore = await app.inject({ method: 'GET', url: '/users' })
+  const listBefore = await app.inject({ method: 'GET', url: '/users?page=3' })
   assert.match(listBefore.payload, /To Delete/)
 
   const idMatch = listBefore.payload.match(/href="\/users\/([0-9a-f-]+)"[^>]*>\s*To Delete/)
@@ -176,7 +204,7 @@ test('delete user removes from list', async (t) => {
   assert.equal(res.statusCode, 302)
   assert.equal(res.headers.location, '/users')
 
-  const listAfter = await app.inject({ method: 'GET', url: '/users' })
+  const listAfter = await app.inject({ method: 'GET', url: '/users?page=3' })
   assert.doesNotMatch(listAfter.payload, /To Delete/)
 })
 

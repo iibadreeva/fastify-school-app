@@ -22,3 +22,15 @@ block content
             form.d-inline(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }) onsubmit="return confirm('Удалить пользователя?')")
               input(type="hidden" name="_method" value="DELETE")
               button.btn.btn-sm.btn-outline-danger(type="submit") Удалить
+  .text-center
+    if totalPages > 1
+      p.text-muted.mb-3 Страница #{page} из #{totalPages}
+    nav.mb-3(aria-label="Пагинация пользователей")
+      if hasPrev
+        a.btn.btn-outline-secondary.me-2(href=prevUrl) ← Назад
+      else
+        span.btn.btn-outline-secondary.me-2.disabled ← Назад
+      if hasNext
+        a.btn.btn-outline-secondary(href=nextUrl) Вперёд →
+      else
+        span.btn.btn-outline-secondary.disabled Вперёд →
