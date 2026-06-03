@@ -440,6 +440,44 @@ http://127.0.0.1:3000/test/%3Cscript%3Ealert('attack!')%3B%3C%2Fscript%3E
 
 Папка `plugins/` — для кода, общего для всего приложения: аутентификация, кэш, декораторы, хуки. Файлы подхватываются [@fastify/autoload](https://github.com/fastify/fastify-autoload) в алфавитном порядке; порядок важен для связанных плагинов (`middie.js` → `request-log.js`).
 
+### `decorate`, `decorateRequest` и `addHook`
+
+В Fastify плагины расширяют приложение тремя основными способами. **Не все три обязательны** — выбирайте по задаче.
+
+| Механизм | Куда добавляет | Типичное назначение |
+|----------|----------------|---------------------|
+| [`fastify.decorate`](https://fastify.dev/docs/latest/Reference/Decorators/) | Инстанс Fastify (`fastify.*`) | Общий API приложения: сервисы, утилиты, `fastify.reverse` |
+| [`fastify.decorateRequest`](https://fastify.dev/docs/latest/Reference/Decorators/#decoraterequest) / [`decorateReply`](https://fastify.dev/docs/latest/Reference/Decorators/#decoratereply) | Каждый `request` / `reply` | Поля и методы на каждом запросе: `request.user`, `request.flash()` |
+| [`fastify.addHook`](https://fastify.dev/docs/latest/Reference/Hooks/) | Жизненный цикл запроса | Сквозная логика без копипасты в маршрутах: auth, заголовки, логи |
+
+#### Что используется в этом проекте
+
+| Механизм | Файл | Зачем |
+|----------|------|--------|
+| `decorate` | `plugins/reverse-routes.js` | `fastify.reverse(name)` — построение URL по имени маршрута |
+| `decorate` | `plugins/support.js` | Пример из Fastify CLI (`fastify.someSupport`) — учебный, в логике приложения не участвует |
+| `addHook` (`preHandler`) | `plugins/auth-context.js` | `currentUser` и `flashMessages` в `reply.locals` для всех Pug-шаблонов |
+| `addHook` (`onSend`) | `plugins/no-cache.js` | `Cache-Control: no-store` на каждый ответ |
+| `addHook` (`onRoute`) | `plugins/reverse-routes.js` | Сбор карты имён маршрутов при регистрации |
+| `decorateRequest` | — | **Своих декораторов нет** — используем готовые из плагинов |
+| `decorateRequest` (из пакетов) | `session.js`, `flash.js` | `request.session`, `request.flash()` — внутри `@fastify/session` и `@fastify/flash` |
+
+#### Когда что выбирать
+
+```
+Нужно на всём приложении (один раз)?     → decorate (fastify.*)
+Нужно на каждом request/reply?           → decorateRequest / decorateReply
+                                         ИЛИ preHandler + request / reply.locals
+Нужно на каждом ответе / при регистрации маршрута? → addHook (onSend, onRoute, …)
+Логика только одного маршрута?           → контроллер или hook с scope: 'route'
+```
+
+- **`decorate`** — да, если API должен быть доступен как `fastify.reverse(...)` или `request.server.reverse(...)` из любого места. Без декоратора пришлось бы тащить отдельный модуль с состоянием.
+- **`addHook`** — да, если одно и то же должно выполняться на многих или всех маршрутах (шапка, flash, кэш). Не дублируйте hook в контроллерах: для одного сценария достаточно `setFlashSuccess` / `redirectIfGuest` в `lib/controllers/`.
+- **`decorateRequest`** — **не обязателен** в текущей архитектуре. Авторизация идёт через `request.session.userId` и `lib/auth/sessionAuth.js`; для шаблонов — `preHandler` в `auth-context.js` и `reply.locals`. Имеет смысл добавлять свой `request.user`, только если одно и то же поле понадобится в десятках обработчиков и хочется единый контракт на `request` вместо `reply.locals.currentUser`.
+
+Плагины оформляются через [`fastify-plugin`](https://github.com/fastify/fastify-plugin) (`fp`), чтобы декораторы и хуки были видны снаружи папки `plugins/` (см. комментарий в `support.js`).
+
 ### Логирование HTTP-запросов (dev)
 
 | Плагин | Пакет | Назначение |
