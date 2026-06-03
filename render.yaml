@@ -1,0 +1,22 @@
+# Blueprint для Render: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: fastify-school-app
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      # Persistent Disk (см. disk ниже) — путь к SQLite на сервере
+      - key: DATABASE_PATH
+        value: /var/data/app.sqlite
+    disk:
+      name: sqlite-data
+      mountPath: /var/data
+      sizeGB: 1

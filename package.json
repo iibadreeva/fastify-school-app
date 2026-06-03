@@ -9,8 +9,12 @@
   },
   "scripts": {
     "test": "node --test test/**/*.test.js",
-    "start": "fastify start -l info app.js",
+    "build": "npm rebuild sqlite3 --build-from-source",
+    "start": "fastify start -l info app.js -a 0.0.0.0",
     "dev": "fastify start -w -l info -P app.js --ignore-watch=data"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@faker-js/faker": "^10.4.0",

@@ -43,7 +43,8 @@ npm run dev
 | Команда        | Назначение |
 |----------------|------------|
 | `npm run dev`  | Режим разработки: автоперезагрузка (`-w`), логи; папка `data/` (SQLite) **не** отслеживается — иначе после регистрации сервер перезапускается и отдаёт 503 |
-| `npm start`    | Запуск в production-режиме |
+| `npm run build`| Сборка native-модуля `sqlite3` на сервере (Render: `npm ci && npm run build`) |
+| `npm start`    | Production: слушает `0.0.0.0`, порт из `PORT` (Render задаёт автоматически) |
 | `npm test`     | Запуск тестов (встроенный `node:test`) |
 
 ## Структура проекта
@@ -589,6 +590,41 @@ Cache-Control: no-store
 
 [^1]: [MDN — заголовок `Cache-Control`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control) (`no-store`: не сохранять ответ в кэше).
 [^2]: [OWASP — Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) (рекомендации по защите сессий и чувствительных данных в браузере).
+
+## Деплой на Render
+
+В репозитории есть [`render.yaml`](render.yaml) (Blueprint). Главная проблема на Linux — **prebuilt-бинарник `sqlite3` с GLIBC 2.38** не совпадает с окружением Render; решается пересборкой на сервере.
+
+### Через Blueprint (рекомендуется)
+
+1. Подключите репозиторий на [Render](https://render.com/) → **New** → **Blueprint** → выберите репозиторий.
+2. Render подхватит `render.yaml`: build, start, секреты, диск для SQLite.
+
+### Вручную (Web Service)
+
+| Поле | Значение |
+|------|----------|
+| **Build Command** | `npm ci && npm run build` |
+| **Start Command** | `npm start` |
+| **Node** | 20+ |
+
+**Environment:**
+
+| Переменная | Значение |
+|------------|----------|
+| `NODE_ENV` | `production` |
+| `SESSION_SECRET` | случайная строка ≥ 32 символов |
+| `COOKIE_SECRET` | случайная строка |
+| `DATABASE_PATH` | `/var/data/app.sqlite` (если подключён Persistent Disk) |
+
+**Persistent Disk** (1 GB, mount `/var/data`) — чтобы SQLite не терялся при redeploy. Без диска данные живут только до перезапуска инстанса.
+
+### Важно
+
+- **`node_modules` не коммитить** — Render ставит зависимости сам; иначе снова `ERR_DLOPEN_FAILED` / `GLIBC_2.38`.
+- После смены build-команды: **Clear build cache & deploy**.
+- `npm start` слушает `0.0.0.0`; порт берётся из `PORT` (Render задаёт автоматически).
+- В production cookie сессии с `secure: true` (HTTPS на Render).
 
 ## Тестирование
 

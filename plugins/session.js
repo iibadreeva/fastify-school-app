@@ -12,7 +12,7 @@ export default fp(async function sessionPlugin (fastify) {
     secret: process.env.SESSION_SECRET || 'dev-session-secret-minimum-32-characters!!',
     saveUninitialized: false,
     cookie: {
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
