@@ -4,6 +4,7 @@ import {
   build,
   createAuthenticatedSession,
   findUserIdInList,
+  mergeCookieHeaders,
 } from '../helper.js'
 import getUsers from '../../lib/getUsers.js'
 
@@ -128,12 +129,25 @@ test('create user redirects to users list and normalizes email', async (t) => {
 
   const list = await app.inject({
     method: 'GET',
-    url: '/users?page=3',
+    url: '/users',
+    headers: { cookie: mergeCookieHeaders(cookie, res.headers['set-cookie']) },
   })
 
   assert.equal(list.statusCode, 200)
-  assert.match(list.payload, /New User/)
-  assert.match(list.payload, /test@example.com/)
+  assert.match(list.payload, /alert-success/)
+  assert.match(list.payload, /Пользователь добавлен в список/)
+
+  const id = await findUserIdInList(app, 'New User', {
+    cookie: mergeCookieHeaders(cookie, res.headers['set-cookie']),
+  })
+  assert.ok(id)
+
+  const show = await app.inject({
+    method: 'GET',
+    url: `/users/${id}`,
+    headers: { cookie },
+  })
+  assert.match(show.payload, /test@example.com/)
 })
 
 test('create user rejects duplicate email', async (t) => {
@@ -158,10 +172,12 @@ test('create user rejects duplicate email', async (t) => {
 test('edit user form', async (t) => {
   const app = await build(t)
   const user = users[0]
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'GET',
     url: `/users/${user.id}/edit`,
+    headers: { cookie },
   })
 
   assert.equal(res.statusCode, 200)
@@ -190,13 +206,24 @@ test('patch user updates and redirects to show', async (t) => {
     method: 'PATCH',
     url: `/users/${id}`,
     payload: 'username=Patched+User&email=patched%40example.com',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      cookie: mergeCookieHeaders(cookie, createRes.headers['set-cookie']),
+    },
   })
 
   assert.equal(res.statusCode, 302)
   assert.equal(res.headers.location, `/users/${id}`)
 
-  const show = await app.inject({ method: 'GET', url: `/users/${id}` })
+  const show = await app.inject({
+    method: 'GET',
+    url: `/users/${id}`,
+    headers: {
+      cookie: mergeCookieHeaders(cookie, res.headers['set-cookie']),
+    },
+  })
+  assert.match(show.payload, /alert-success/)
+  assert.match(show.payload, /Данные пользователя обновлены/)
   assert.match(show.payload, /Patched User/)
   assert.match(show.payload, /patched@example.com/)
 })
@@ -219,6 +246,7 @@ test('delete user removes from list', async (t) => {
   const res = await app.inject({
     method: 'DELETE',
     url: `/users/${id}`,
+    headers: { cookie: mergeCookieHeaders(cookie, createRes.headers['set-cookie']) },
   })
 
   assert.equal(res.statusCode, 302)
@@ -226,19 +254,31 @@ test('delete user removes from list', async (t) => {
 
   const listAfter = await app.inject({
     method: 'GET',
+    url: '/users',
+    headers: {
+      cookie: mergeCookieHeaders(cookie, res.headers['set-cookie']),
+    },
+  })
+  assert.match(listAfter.payload, /alert-success/)
+  assert.match(listAfter.payload, /Пользователь удалён/)
+
+  const show = await app.inject({
+    method: 'GET',
     url: `/users/${id}`,
     headers: { cookie },
   })
-  assert.equal(listAfter.statusCode, 404)
+  assert.equal(show.statusCode, 404)
 })
 
 test('show user has edit button', async (t) => {
   const app = await build(t)
   const user = users[0]
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'GET',
     url: `/users/${user.id}`,
+    headers: { cookie },
   })
 
   assert.equal(res.statusCode, 200)
@@ -261,6 +301,8 @@ test('create user validation errors are shown on form', async (t) => {
   })
 
   assert.equal(res.statusCode, 422)
+  assert.match(res.payload, /alert-danger/)
+  assert.match(res.payload, /Не удалось добавить пользователя/)
   assert.match(res.payload, /Введите корректный email/)
   assert.match(res.payload, /Пароли не совпадают/)
   assert.match(res.payload, /value="a"/)

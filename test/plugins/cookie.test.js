@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import * as assert from 'node:assert'
-import { build } from '../helper.js'
+import { build, mergeCookieHeaders } from '../helper.js'
 
 test('demo page sets signed demo_visits cookie and increments counter', async (t) => {
   const app = await build(t)
@@ -8,15 +8,14 @@ test('demo page sets signed demo_visits cookie and increments counter', async (t
   const first = await app.inject({ url: '/demo' })
 
   assert.equal(first.statusCode, 200)
-  assert.match(first.headers['set-cookie'], /demo_visits=/)
+  const setCookie = mergeCookieHeaders(first.headers['set-cookie'])
+  assert.match(setCookie, /demo_visits=/)
   assert.match(first.payload, /Визитов на этой странице/)
   assert.match(first.payload, /<strong>1<\/strong>/)
 
-  const cookieHeader = first.headers['set-cookie']
-
   const second = await app.inject({
     url: '/demo',
-    headers: { cookie: cookieHeader },
+    headers: { cookie: setCookie },
   })
 
   assert.equal(second.statusCode, 200)

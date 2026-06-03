@@ -1,4 +1,5 @@
 import fp from 'fastify-plugin'
+import { getFlashMessages } from '../lib/flash/flashMessages.js'
 import { findUserById } from '../lib/repositories/usersRepository.js'
 
 /**
@@ -24,6 +25,11 @@ export default fp(async function authContextPlugin (fastify) {
       }
     }
 
-    reply.locals = { ...reply.locals, currentUser }
+    // flash с прошлого redirect (после регистрации, создания пользователя и т.д.)
+    reply.locals = {
+      ...reply.locals,
+      currentUser,
+      flashMessages: getFlashMessages(reply),
+    }
   })
-}, { name: 'auth-context', dependencies: ['session'] })
+}, { name: 'auth-context', dependencies: ['session', 'flash'] })

@@ -35,11 +35,34 @@ async function build (t) {
 
 const formHeaders = { 'content-type': 'application/x-www-form-urlencoded' }
 
-/** Cookie с sessionId после регистрации (для тестов с авторизацией) */
+/** Одна строка Cookie из Set-Cookie (массив или строка) */
 export function sessionCookieFromResponse (res) {
   const header = res.headers['set-cookie']
   if (!header) return ''
-  return Array.isArray(header) ? header.join('; ') : header
+  return mergeCookieHeaders(header)
+}
+
+/** Склеить несколько Set-Cookie / Cookie в один заголовок для inject */
+export function mergeCookieHeaders (...headers) {
+  const parts = []
+
+  for (const header of headers) {
+    if (!header) continue
+    const items = Array.isArray(header) ? header : [header]
+
+    for (const item of items) {
+      const nameValue = item.split(';')[0].trim()
+      if (nameValue) parts.push(nameValue)
+    }
+  }
+
+  const seen = new Set()
+  return parts.filter((p) => {
+    const name = p.split('=')[0]
+    if (seen.has(name)) return false
+    seen.add(name)
+    return true
+  }).join('; ')
 }
 
 /** Найти id пользователя по имени на страницах списка /users */

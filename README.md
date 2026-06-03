@@ -55,7 +55,8 @@ fastify-school-app/
 │   ├── support.js      # Пример кастомного декоратора
 │   ├── cookie.js       # Cookie: request.cookies, reply.setCookie
 │   ├── session.js      # Серверные сессии (@fastify/session)
-│   ├── auth-context.js # currentUser в reply.locals для шапки
+│   ├── flash.js        # Flash-сообщения (@fastify/flash)
+│   ├── auth-context.js # currentUser и flashMessages в reply.locals
 │   ├── no-cache.js     # Cache-Control: no-store на все ответы
 │   ├── middie.js       # Middleware Express-стиля (fastify.use)
 │   ├── request-log.js  # Access log в dev (morgan)
@@ -70,6 +71,8 @@ fastify-school-app/
 │   ├── RouteNames.js   # Константы имён маршрутов (для fastify.reverse)
 │   ├── auth/
 │   │   └── sessionAuth.js        # loginSession, redirectIfGuest
+│   ├── flash/
+│   │   └── flashMessages.js      # setFlashSuccess/Error, getFlashMessages
 │   ├── controllers/
 │   │   ├── authController.js     # Вход, регистрация, профиль, выход
 │   │   ├── usersController.js   # Обработчики HTTP для /users
@@ -493,6 +496,17 @@ http://127.0.0.1:3000/test/%3Cscript%3Ealert('attack!')%3B%3C%2Fscript%3E
 
 Тесты: `test/routes/auth.test.js` (регистрация, неверный пароль, logout, шапка).
 
+### Flash-сообщения (`@fastify/flash`)
+
+Плагин `plugins/flash.js` (после `session`) хранит одноразовые сообщения в сессии.
+
+| Тип | Bootstrap | Когда |
+|-----|-----------|--------|
+| `success` | `alert-success` (зелёный) | Вход, выход, регистрация (`Аккаунт создан`), CRUD пользователей/курсов (создание, PATCH, DELETE) |
+| `error` | `alert-danger` (красный) | Ошибки валидации, неверный логин, «Войдите, чтобы продолжить» (`redirectIfGuest`), не найден при удалении |
+
+Сообщения выводятся в `views/layout/page.pug` над контентом страницы. После redirect текст читается в `plugins/auth-context.js` через `reply.flash()`; при ответе 422 — в контроллере перед `reply.view`. При выходе сбрасывается только `userId` в сессии (не `destroy`), чтобы flash дошёл до главной страницы.
+
 ### Cache-Control: no-store
 
 Плагин `plugins/no-cache.js` через хук `onSend` добавляет ко **всем ответам** заголовок:
@@ -538,6 +552,7 @@ npm test
 - [@fastify/autoload](https://github.com/fastify/fastify-autoload) — автозагрузка `routes/` и `plugins/`
 - [@fastify/cookie](https://github.com/fastify/fastify-cookie) — cookie в запросах и ответах
 - [@fastify/session](https://github.com/fastify/session) — серверные сессии (вход, профиль)
+- [@fastify/flash](https://github.com/fastify/flash) — одноразовые сообщения после redirect
 - [@fastify/formbody](https://github.com/fastify/fastify-formbody) — парсинг HTML-форм
 - [@fastify/view](https://github.com/fastify/point-of-view) — шаблонизатор Pug
 - [@fastify/static](https://github.com/fastify/fastify-static) — статические файлы (`/assets/`)

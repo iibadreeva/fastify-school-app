@@ -1,6 +1,10 @@
 ﻿import { test } from 'node:test'
 import * as assert from 'node:assert'
-import { build } from '../helper.js'
+import {
+  build,
+  createAuthenticatedSession,
+  mergeCookieHeaders,
+} from '../helper.js'
 
 const COURSE_ARRAYS = 'JS: Массивы'
 const COURSE_FUNCTIONS = 'JS: Функции'
@@ -19,15 +23,31 @@ test('courses index lists all courses', async (t) => {
   assert.match(res.payload, new RegExp(COURSE_ARRAYS))
   assert.match(res.payload, new RegExp(COURSE_FUNCTIONS))
   assert.match(res.payload, /Поиск по названию или описанию/)
+  assert.doesNotMatch(res.payload, /Новый курс/)
+})
+
+test('courses index shows new course button when authenticated', async (t) => {
+  const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
+
+  const res = await app.inject({
+    method: 'GET',
+    url: '/courses',
+    headers: { cookie },
+  })
+
+  assert.equal(res.statusCode, 200)
   assert.match(res.payload, /Новый курс/)
 })
 
 test('new course form', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'GET',
     url: '/courses/new',
+    headers: { cookie },
   })
 
   assert.equal(res.statusCode, 200)
@@ -117,6 +137,7 @@ test('courses search preserves query in form', async (t) => {
 
 test('create course rejects duplicate title', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'POST',
@@ -124,6 +145,7 @@ test('create course rejects duplicate title', async (t) => {
     payload: 'title=js%3A+%D0%BC%D0%B0%D1%81%D1%81%D0%B8%D0%B2%D1%8B&description=Другое+описание+курса+про+массивы+в+JS',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
+      cookie,
     },
   })
 
@@ -134,6 +156,7 @@ test('create course rejects duplicate title', async (t) => {
 
 test('create course validation errors are shown on form', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'POST',
@@ -141,6 +164,7 @@ test('create course validation errors are shown on form', async (t) => {
     payload: 'title=a&description=short',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
+      cookie,
     },
   })
 
@@ -153,6 +177,7 @@ test('create course validation errors are shown on form', async (t) => {
 
 test('create course redirects to courses list', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'POST',
@@ -160,6 +185,7 @@ test('create course redirects to courses list', async (t) => {
     payload: 'title=Ruby&description=Course+about+Ruby',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
+      cookie,
     },
   })
 
@@ -178,10 +204,12 @@ test('create course redirects to courses list', async (t) => {
 
 test('show course page', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'GET',
     url: '/courses/1',
+    headers: { cookie },
   })
 
   assert.equal(res.statusCode, 200)
@@ -191,10 +219,12 @@ test('show course page', async (t) => {
 
 test('edit course form', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'GET',
     url: '/courses/1/edit',
+    headers: { cookie },
   })
 
   assert.equal(res.statusCode, 200)
@@ -204,30 +234,40 @@ test('edit course form', async (t) => {
 
 test('patch course updates and redirects to show', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'PATCH',
     url: '/courses/1',
     payload: 'title=Updated+Course&description=Updated+description+for+course+one',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
   })
 
   assert.equal(res.statusCode, 302)
   assert.equal(res.headers.location, '/courses/1')
 
-  const show = await app.inject({ method: 'GET', url: '/courses/1' })
+  const show = await app.inject({
+    method: 'GET',
+    url: '/courses/1',
+    headers: {
+      cookie: mergeCookieHeaders(cookie, res.headers['set-cookie']),
+    },
+  })
+  assert.match(show.payload, /alert-success/)
+  assert.match(show.payload, /Курс обновлён/)
   assert.match(show.payload, /Updated Course/)
   assert.match(show.payload, /Updated description for course one/)
 })
 
 test('delete course removes from list', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const createRes = await app.inject({
     method: 'POST',
     url: '/courses',
     payload: 'title=Temp+Course&description=Temporary+course+description+here',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
   })
   assert.equal(createRes.statusCode, 302)
 
@@ -241,11 +281,20 @@ test('delete course removes from list', async (t) => {
   const res = await app.inject({
     method: 'DELETE',
     url: `/courses/${id}`,
+    headers: { cookie },
   })
 
   assert.equal(res.statusCode, 302)
 
-  const listAfter = await app.inject({ method: 'GET', url: '/courses' })
+  const listAfter = await app.inject({
+    method: 'GET',
+    url: '/courses',
+    headers: {
+      cookie: mergeCookieHeaders(cookie, res.headers['set-cookie']),
+    },
+  })
+  assert.match(listAfter.payload, /alert-success/)
+  assert.match(listAfter.payload, /Курс удалён/)
   assert.doesNotMatch(listAfter.payload, /Temp Course/)
 })
 

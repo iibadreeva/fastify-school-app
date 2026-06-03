@@ -16,6 +16,7 @@
     "@faker-js/faker": "^10.4.0",
     "@fastify/autoload": "^6.0.0",
     "@fastify/cookie": "^11.0.2",
+    "@fastify/flash": "^6.0.3",
     "@fastify/formbody": "^8.0.2",
     "@fastify/middie": "^9.3.2",
     "@fastify/sensible": "^6.0.0",

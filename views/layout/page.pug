@@ -23,6 +23,12 @@ html
                                 a(href=reverse(RouteNames.AUTH_LOGIN)) Вход
                                 a(href=reverse(RouteNames.AUTH_REGISTER)) Регистрация
 
+                //- Bootstrap alerts: success — зелёный, error — красный (@fastify/flash)
+                if flashMessages && flashMessages.length
+                    .container.mb-3
+                        each msg in flashMessages
+                            div.alert(class=msg.alertClass role="alert")= msg.text
+
                 block content
             block footer
                 #footer.text-center
