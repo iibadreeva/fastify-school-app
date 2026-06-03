@@ -4,6 +4,7 @@ import * as usersController from '../../lib/controllers/usersController.js'
 /**
  * Маршруты пользователей (/users).
  * Логика — в lib/controllers/usersController.js
+ * GET/POST /users/new и POST / — только для авторизованных (см. redirectIfGuest).
  */
 export default async function (fastify, opts) {
   fastify.get('/', { name: RouteNames.USERS_INDEX }, usersController.index)

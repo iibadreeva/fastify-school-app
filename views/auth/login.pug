@@ -1,0 +1,30 @@
+extends ../layout/page
+
+block content
+  h1.mb-4 Вход
+  if errors && errors._form
+    .alert.alert-danger= errors._form
+  form(method="POST" action=reverse(RouteNames.AUTH_LOGIN_POST) novalidate)
+    .mb-3
+      label.form-label(for="email") Email
+      input.form-control#email(
+        type="email"
+        name="email"
+        value=values && values.email ? values.email : ''
+        class=(errors && errors.email) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.email
+        .invalid-feedback= errors.email
+    .mb-3
+      label.form-label(for="password") Пароль
+      input.form-control#password(
+        type="password"
+        name="password"
+        class=(errors && errors.password) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.password
+        .invalid-feedback= errors.password
+    button.btn.btn-primary(type="submit") Войти
+    a.btn.btn-secondary.ms-2(href=reverse(RouteNames.AUTH_REGISTER)) Регистрация

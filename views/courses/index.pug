@@ -1,7 +1,8 @@
 ﻿extends ../layout/page
 block content
     h1= header
-    a.btn.btn-primary.mb-4(href=reverse(RouteNames.NEW_COURSE)) Новый курс
+    if currentUser
+        a.btn.btn-primary.mb-4(href=reverse(RouteNames.NEW_COURSE)) Новый курс
     form.mb-4(method="GET" action=reverse(RouteNames.COURSES_INDEX))
         .input-group
             input.form-control(
@@ -22,8 +23,9 @@ block content
                 h2
                     a(href=reverse(RouteNames.SHOW_COURSE, { id: course.id }))= course.title
                 p= course.description
-                .mt-2
-                    a.btn.btn-sm.btn-outline-primary.me-1(href=reverse(RouteNames.EDIT_COURSE, { id: course.id })) Редактировать
-                    form.d-inline(method="POST" action=reverse(RouteNames.DELETE_COURSE, { id: course.id }) onsubmit="return confirm('Удалить курс?')")
-                        input(type="hidden" name="_method" value="DELETE")
-                        button.btn.btn-sm.btn-outline-danger(type="submit") Удалить
+                if currentUser
+                    .mt-2
+                        a.btn.btn-sm.btn-outline-primary.me-1(href=reverse(RouteNames.EDIT_COURSE, { id: course.id })) Редактировать
+                        form.d-inline(method="POST" action=reverse(RouteNames.DELETE_COURSE, { id: course.id }) onsubmit="return confirm('Удалить курс?')")
+                            input(type="hidden" name="_method" value="DELETE")
+                            button.btn.btn-sm.btn-outline-danger(type="submit") Удалить

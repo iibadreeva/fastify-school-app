@@ -4,9 +4,11 @@ block content
   h1= course.title
   p= course.description
   .mt-3
-    a.btn.btn-primary(href=reverse(RouteNames.EDIT_COURSE, { id: course.id })) Редактировать
+    if currentUser
+      a.btn.btn-primary(href=reverse(RouteNames.EDIT_COURSE, { id: course.id })) Редактировать
     a.btn.btn-secondary.ms-2(href=reverse(RouteNames.COURSES_INDEX)) ← К списку
-  hr.my-4
-  form(method="POST" action=reverse(RouteNames.DELETE_COURSE, { id: course.id }) onsubmit="return confirm('Удалить курс?')")
-    input(type="hidden" name="_method" value="DELETE")
-    button.btn.btn-danger(type="submit") Удалить курс
+  if currentUser
+    hr.my-4
+    form(method="POST" action=reverse(RouteNames.DELETE_COURSE, { id: course.id }) onsubmit="return confirm('Удалить курс?')")
+      input(type="hidden" name="_method" value="DELETE")
+      button.btn.btn-danger(type="submit") Удалить курс

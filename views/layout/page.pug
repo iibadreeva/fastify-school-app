@@ -11,10 +11,17 @@ html
                     div.container.d-flex.justify-content-between.align-items-center
                         span.fw-bold.text-primary
                             a(href=reverse(RouteNames.HOME)) Главная
-                        nav.d-flex.gap-3
+                        nav.d-flex.gap-3.align-items-center
                             a(href=reverse(RouteNames.USERS_INDEX)) Пользователи
                             a(href=reverse(RouteNames.COURSES_INDEX)) Курсы
                             a(href=reverse(RouteNames.TEST)) Тесты
+                            if currentUser
+                                a(href=reverse(RouteNames.AUTH_PROFILE))= currentUser.username
+                                form.d-inline.mb-0(method="POST" action=reverse(RouteNames.AUTH_LOGOUT))
+                                    button.btn.btn-link.p-0.border-0(type="submit") Выход
+                            else
+                                a(href=reverse(RouteNames.AUTH_LOGIN)) Вход
+                                a(href=reverse(RouteNames.AUTH_REGISTER)) Регистрация
 
                 block content
             block footer

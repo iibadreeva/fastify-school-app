@@ -22,7 +22,19 @@ html(lang="ru")
         background: #e8f4f8;
         font-size: 0.875rem;
       }
+      .visits {
+        margin-top: 1.25rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        background: #f0f4ff;
+        font-size: 0.9375rem;
+      }
   body
     h1= title
     p= message
-    span.badge Pug + @fastify/view
+    p.visits
+      | Визитов на этой странице (cookie
+      code demo_visits
+      | ): 
+      strong= visits
+    span.badge Pug + @fastify/view + @fastify/cookie

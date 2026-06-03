@@ -10,6 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 /**
  * Подключение шаблонизатора Pug через @fastify/view.
  *
+ * currentUser в шаблонах — из reply.locals (plugins/auth-context.js).
+ *
  * @see https://github.com/fastify/point-of-view
  */
 export default fp(async function (fastify) {

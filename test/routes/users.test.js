@@ -1,6 +1,10 @@
 ﻿import { test } from 'node:test'
 import * as assert from 'node:assert'
-import { build } from '../helper.js'
+import {
+  build,
+  createAuthenticatedSession,
+  findUserIdInList,
+} from '../helper.js'
 import getUsers from '../../lib/getUsers.js'
 
 const users = getUsers()
@@ -16,7 +20,39 @@ test('users index', async (t) => {
   assert.equal(res.statusCode, 200)
   assert.match(res.payload, new RegExp(users[0].username))
   assert.match(res.payload, new RegExp(users[0].email))
+  assert.doesNotMatch(res.payload, /Новый пользователь/)
+})
+
+test('users index shows new user button when authenticated', async (t) => {
+  const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
+
+  const res = await app.inject({
+    method: 'GET',
+    url: '/users',
+    headers: { cookie },
+  })
+
+  assert.equal(res.statusCode, 200)
   assert.match(res.payload, /Новый пользователь/)
+})
+
+test('new user form requires authentication', async (t) => {
+  const app = await build(t)
+
+  const guest = await app.inject({ method: 'GET', url: '/users/new' })
+  assert.equal(guest.statusCode, 302)
+  assert.equal(guest.headers.location, '/auth/login')
+
+  const cookie = await createAuthenticatedSession(app)
+  const auth = await app.inject({
+    method: 'GET',
+    url: '/users/new',
+    headers: { cookie },
+  })
+
+  assert.equal(auth.statusCode, 200)
+  assert.match(auth.payload, /Новый пользователь/)
 })
 
 test('users index paginates 10 per page', async (t) => {
@@ -47,22 +83,6 @@ test('users index paginates 10 per page', async (t) => {
   assert.doesNotMatch(page3.payload, /href="[^"]*">Вперёд →/)
 })
 
-test('new user form', async (t) => {
-  const app = await build(t)
-
-  const res = await app.inject({
-    method: 'GET',
-    url: '/users/new',
-  })
-
-  assert.equal(res.statusCode, 200)
-  assert.match(res.payload, /Новый пользователь/)
-  assert.match(res.payload, /name="username"/)
-  assert.match(res.payload, /name="email"/)
-  assert.match(res.payload, /name="password"/)
-  assert.match(res.payload, /name="passwordConfirm"/)
-})
-
 test('get user', async (t) => {
   const app = await build(t)
   const userIndex = 5
@@ -91,6 +111,7 @@ test('undefined user', async (t) => {
 
 test('create user redirects to users list and normalizes email', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'POST',
@@ -98,6 +119,7 @@ test('create user redirects to users list and normalizes email', async (t) => {
     payload: 'username=New+User&email=Test%40Example.COM&password=secret&passwordConfirm=secret',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
+      cookie,
     },
   })
 
@@ -116,6 +138,7 @@ test('create user redirects to users list and normalizes email', async (t) => {
 
 test('create user rejects duplicate email', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'POST',
@@ -123,6 +146,7 @@ test('create user rejects duplicate email', async (t) => {
     payload: `username=Duplicate&email=${encodeURIComponent(users[0].email.toUpperCase())}&password=secret12&passwordConfirm=secret12`,
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
+      cookie,
     },
   })
 
@@ -149,19 +173,18 @@ test('edit user form', async (t) => {
 
 test('patch user updates and redirects to show', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const createRes = await app.inject({
     method: 'POST',
     url: '/users',
     payload: 'username=Patch+Me&email=patch%40example.com&password=secret12&passwordConfirm=secret12',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
   })
   assert.equal(createRes.statusCode, 302)
 
-  const list = await app.inject({ method: 'GET', url: '/users?page=3' })
-  const idMatch = list.payload.match(/href="\/users\/([0-9a-f-]+)"[^>]*>\s*Patch Me/)
-  assert.ok(idMatch, 'user id not found in list')
-  const id = idMatch[1]
+  const id = await findUserIdInList(app, 'Patch Me', { cookie })
+  assert.ok(id, 'user id not found in list')
 
   const res = await app.inject({
     method: 'PATCH',
@@ -180,21 +203,18 @@ test('patch user updates and redirects to show', async (t) => {
 
 test('delete user removes from list', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const createRes = await app.inject({
     method: 'POST',
     url: '/users',
     payload: 'username=To+Delete&email=delete%40example.com&password=secret12&passwordConfirm=secret12',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
   })
   assert.equal(createRes.statusCode, 302)
 
-  const listBefore = await app.inject({ method: 'GET', url: '/users?page=3' })
-  assert.match(listBefore.payload, /To Delete/)
-
-  const idMatch = listBefore.payload.match(/href="\/users\/([0-9a-f-]+)"[^>]*>\s*To Delete/)
-  assert.ok(idMatch, 'user id not found in list')
-  const id = idMatch[1]
+  const id = await findUserIdInList(app, 'To Delete', { cookie })
+  assert.ok(id, 'user id not found in list')
 
   const res = await app.inject({
     method: 'DELETE',
@@ -204,8 +224,12 @@ test('delete user removes from list', async (t) => {
   assert.equal(res.statusCode, 302)
   assert.equal(res.headers.location, '/users')
 
-  const listAfter = await app.inject({ method: 'GET', url: '/users?page=3' })
-  assert.doesNotMatch(listAfter.payload, /To Delete/)
+  const listAfter = await app.inject({
+    method: 'GET',
+    url: `/users/${id}`,
+    headers: { cookie },
+  })
+  assert.equal(listAfter.statusCode, 404)
 })
 
 test('show user has edit button', async (t) => {
@@ -224,6 +248,7 @@ test('show user has edit button', async (t) => {
 
 test('create user validation errors are shown on form', async (t) => {
   const app = await build(t)
+  const cookie = await createAuthenticatedSession(app)
 
   const res = await app.inject({
     method: 'POST',
@@ -231,6 +256,7 @@ test('create user validation errors are shown on form', async (t) => {
     payload: 'username=a&email=bad&password=123&passwordConfirm=456',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
+      cookie,
     },
   })
 

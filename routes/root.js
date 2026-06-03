@@ -3,7 +3,16 @@ import { RouteNames } from '../lib/RouteNames.js'
 
 export default async function (fastify, opts) {
   fastify.get('/', { name: RouteNames.HOME }, async function (request, reply) {
-    return reply.view('index', { root: true })
+    const visited = request.cookies.visited;
+    if (!visited) {
+      reply.setCookie('visited', 'root', {
+        path: '/',
+        httpOnly: true,
+        maxAge: 60 * 60 * 10, // 10 мин
+        sameSite: 'lax',
+      })
+    }
+    return reply.view('index', { root: true, visited })
   })
   fastify.post('/', async function (request, res) {
     res.send(`POST ${fastify.reverse(RouteNames.USERS_INDEX)}`)
@@ -21,9 +30,9 @@ export default async function (fastify, opts) {
     // test?name=inna
     const { name } = req.query;
     if(!name){
-      res.send('Hello World!')
+      return res.send('Hello World!')
     }
-    res.send(`Hello ${name}!`)
+    return res.send(`Hello ${name}!`)
   })
 
   fastify.get('/test/:id', (req, res) => {

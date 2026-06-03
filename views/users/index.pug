@@ -2,7 +2,8 @@
 
 block content
   h1.mb-4 Пользователи
-  a.btn.btn-primary.mb-4(href=reverse(RouteNames.NEW_USER)) Новый пользователь
+  if currentUser
+    a.btn.btn-primary.mb-4(href=reverse(RouteNames.NEW_USER)) Новый пользователь
   table.table.table-striped.table-hover
     thead
       tr
@@ -18,10 +19,11 @@ block content
           td= user.email
           td= user.password
           td.text-end
-            a.btn.btn-sm.btn-outline-primary.me-1(href=reverse(RouteNames.EDIT_USER, { id: user.id })) Редактировать
-            form.d-inline(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }) onsubmit="return confirm('Удалить пользователя?')")
-              input(type="hidden" name="_method" value="DELETE")
-              button.btn.btn-sm.btn-outline-danger(type="submit") Удалить
+            if currentUser
+              a.btn.btn-sm.btn-outline-primary.me-1(href=reverse(RouteNames.EDIT_USER, { id: user.id })) Редактировать
+              form.d-inline(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }) onsubmit="return confirm('Удалить пользователя?')")
+                input(type="hidden" name="_method" value="DELETE")
+                button.btn.btn-sm.btn-outline-danger(type="submit") Удалить
   .text-center
     if totalPages > 1
       p.text-muted.mb-3 Страница #{page} из #{totalPages}

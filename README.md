@@ -6,7 +6,7 @@
 ```bash
 HTTP-запрос
     ↓
-plugins/          — инфраструктура (no-cache, middie, request-log, formbody, view, static, reverse-routes)
+plugins/          — инфраструктура (cookie, session, auth-context, no-cache, …)
     ↓
 routes/           — маршрутизация (URL → обработчик)
     ↓
@@ -53,6 +53,9 @@ fastify-school-app/
 ├── plugins/            # Общие плагины (декораторы, хуки, утилиты)
 │   ├── sensible.js     # Удобные HTTP-ошибки (@fastify/sensible)
 │   ├── support.js      # Пример кастомного декоратора
+│   ├── cookie.js       # Cookie: request.cookies, reply.setCookie
+│   ├── session.js      # Серверные сессии (@fastify/session)
+│   ├── auth-context.js # currentUser в reply.locals для шапки
 │   ├── no-cache.js     # Cache-Control: no-store на все ответы
 │   ├── middie.js       # Middleware Express-стиля (fastify.use)
 │   ├── request-log.js  # Access log в dev (morgan)
@@ -65,11 +68,16 @@ fastify-school-app/
 │   ├── normalizeEmail.js
 │   ├── hashPassword.js
 │   ├── RouteNames.js   # Константы имён маршрутов (для fastify.reverse)
+│   ├── auth/
+│   │   └── sessionAuth.js        # loginSession, redirectIfGuest
 │   ├── controllers/
+│   │   ├── authController.js     # Вход, регистрация, профиль, выход
 │   │   ├── usersController.js   # Обработчики HTTP для /users
 │   │   └── coursesController.js # Обработчики HTTP для /courses
+│   ├── verifyPassword.js
 │   ├── schemas/
 │   │   ├── createUserSchema.js   # Yup: создание пользователя
+│   │   ├── loginSchema.js        # Yup: вход
 │   │   ├── updateUserSchema.js   # Yup: редактирование (PATCH)
 │   │   ├── createCourseSchema.js # Yup: создание курса
 │   │   └── updateCourseSchema.js # Yup: редактирование курса
@@ -81,9 +89,13 @@ fastify-school-app/
 │       └── coursesRepository.js # In-memory хранилище курсов
 ├── views/              # Pug-шаблоны
 │   ├── layout/
-│   │   └── page.pug    # Общий layout (Bootstrap, навигация)
+│   │   └── page.pug    # Layout: навигация, Вход/Профиль/Выход
 │   ├── index.pug       # Главная страница
 │   ├── demo.pug
+│   ├── auth/
+│   │   ├── login.pug
+│   │   ├── register.pug
+│   │   └── profile.pug
 │   ├── courses/
 │   │   ├── index.pug   # Список, поиск, кнопки редактирования/удаления
 │   │   ├── new.pug     # Создание
@@ -96,6 +108,7 @@ fastify-school-app/
 │       └── edit.pug    # Редактирование (PATCH) и удаление
 ├── routes/             # HTTP-маршруты (каждый файл — Fastify-плагин)
 │   ├── root.js         # Маршруты в корне приложения
+│   ├── auth/           # Вход, регистрация, профиль, префикс /auth
 │   ├── demo/           # Пример HTML-страницы (Pug), префикс /demo
 │   ├── courses/        # Курсы, префикс /courses
 │   └── users/          # Пользователи, префикс /users
@@ -107,9 +120,11 @@ fastify-school-app/
     │   ├── createUserSchema.test.js
     │   └── createCourseSchema.test.js
     ├── plugins/
+    │   ├── cookie.test.js
     │   ├── no-cache.test.js
     │   └── support.test.js
     └── routes/
+        ├── auth.test.js
         ├── courses.test.js
         ├── demo.test.js
         ├── root.test.js
@@ -125,6 +140,7 @@ fastify-school-app/
 | Файл | Префикс | Пример: `fastify.get('/')` → |
 |------|---------|------------------------------|
 | `routes/root.js` | *(корень)* | `GET /` |
+| `routes/auth/index.js` | `/auth` | `GET /auth/login` |
 | `routes/demo/index.js` | `/demo` | `GET /demo` |
 | `routes/users/index.js` | `/users` | `GET /users` |
 | `routes/courses/index.js` | `/courses` | `GET /courses` |
@@ -151,6 +167,27 @@ a(href=reverse(RouteNames.SHOW_USER, { id: user.id }))= user.username
 Префиксы URL задаёт autoload по имени папки (`routes/users` → `/users`, `routes/courses` → `/courses`). Менять путь можно, переименовав папку — ссылки в шаблонах и редиректах обновятся автоматически.
 
 Константы имён — в `lib/RouteNames.js` (например `RouteNames.EDIT_USER` → `'editUser'`).
+
+### Аутентификация (`/auth`)
+
+**Роутинг:** `routes/auth/index.js`  
+**Логика:** `lib/controllers/authController.js`  
+**Сессия:** `request.session.userId` после входа или регистрации
+
+В шапке (`views/layout/page.pug`): для гостя — «Вход» и «Регистрация»; для авторизованного — имя (ссылка на профиль) и кнопка «Выход».
+
+| Метод | URL | Имя маршрута | Ответ |
+|-------|-----|--------------|--------|
+| `GET` | `/auth/login` | `authLogin` | Форма входа |
+| `POST` | `/auth/login` | `authLoginPost` | Проверка email/пароля; редирект на профиль или 422 |
+| `GET` | `/auth/register` | `authRegister` | Форма регистрации |
+| `POST` | `/auth/register` | `authRegisterPost` | Создание пользователя (Yup), автоматический вход, редирект на профиль |
+| `GET` | `/auth/profile` | `authProfile` | Профиль (только для авторизованных; иначе редирект на `/auth/login`) |
+| `POST` | `/auth/logout` | `authLogout` | `session.destroy()`, редирект на `/` |
+
+Регистрация использует ту же Yup-схему, что `POST /users` (`createUserSchema`). Вход — `lib/schemas/loginSchema.js`, проверка пароля — `lib/verifyPassword.js`.
+
+> **Отличие:** `/users/new` — добавление в общий список **только для вошедших пользователей** (кнопка на `/users` видна при `currentUser`); `/auth/register` — регистрация аккаунта для любого гостя.
 
 ### PATCH и DELETE из HTML-форм
 
@@ -192,8 +229,8 @@ form(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }))
 | Метод | URL | Имя маршрута | Ответ |
 |-------|-----|--------------|--------|
 | `GET` | `/users` | `usersIndex` | Таблица (10 записей на страницу, `?page=2`); «Назад» / «Вперёд» |
-| `GET` | `/users/new` | `newUser` | Форма создания |
-| `POST` | `/users` | `createUser` | Создание (Yup); редирект на `/users` или 422 |
+| `GET` | `/users/new` | `newUser` | Форма создания (**только авторизованные**, иначе редирект на `/auth/login`) |
+| `POST` | `/users` | `createUser` | Создание (Yup); **только авторизованные**; редирект на `/users` или 422 |
 | `GET` | `/users/:id/edit` | `editUser` | Форма редактирования |
 | `PATCH` | `/users/:id` | `updateUser` | Обновление (Yup); редирект на карточку или 422 |
 | `DELETE` | `/users/:id` | `deleteUser` | Удаление; редирект на `/users` |
@@ -344,9 +381,11 @@ try {
 
 | Метод | URL | Ответ |
 |-------|-----|--------|
-| `GET` | `/demo` | HTML-страница из шаблона `views/demo.pug` |
+| `GET` | `/demo` | HTML-страница из шаблона `views/demo.pug`; счётчик визитов в cookie `demo_visits` |
 
-Настройка движка шаблонов — в `plugins/view.js`. В маршруте используется `reply.view('demo', { title, message })`.
+Настройка движка шаблонов — в `plugins/view.js`. В маршруте используется `reply.view('demo', { title, message, visits })`.
+
+**Демо `@fastify/cookie`:** при каждом заходе на `/demo` значение в подписанной cookie увеличивается на 1; на странице показывается «Визитов: N». Cookie: `httpOnly`, `sameSite: 'lax'`, `signed: true` (см. `plugins/cookie.js`). Проверка: обновите `/demo` несколько раз в браузере или запустите `npm test` (`test/plugins/cookie.test.js`).
 
 **Когда что использовать:**
 
@@ -414,6 +453,46 @@ http://127.0.0.1:3000/test/%3Cscript%3Ealert('attack!')%3B%3C%2Fscript%3E
 
 Чтобы подключить другое Express-middleware, зарегистрируйте его через `fastify.use(...)` в отдельном файле в `plugins/` и укажите зависимость `{ dependencies: ['middie'] }`, как в `request-log.js`.
 
+### Cookie (`@fastify/cookie`)
+
+Плагин `plugins/cookie.js` регистрирует [@fastify/cookie](https://github.com/fastify/fastify-cookie):
+
+| API | Назначение |
+|-----|------------|
+| `request.cookies` | Прочитать cookie из входящего запроса |
+| `request.unsignCookie(value)` | Проверить подпись и получить значение (для `signed: true`) |
+| `reply.setCookie(name, value, options)` | Отправить `Set-Cookie` |
+| `reply.clearCookie(name)` | Удалить cookie (например при выходе из аккаунта) |
+
+Секрет подписи: переменная окружения `COOKIE_SECRET` (в dev — значение по умолчанию в плагине; в production задайте свой секрет).
+
+**Пример в проекте:** `GET /demo` — счётчик `demo_visits` в `routes/demo/index.js`, тест в `test/plugins/cookie.test.js`.
+
+### Session (`@fastify/session`) — зачем нужна
+
+Плагин `plugins/session.js` регистрирует [@fastify/session](https://github.com/fastify/session). **Обязательно после** `@fastify/cookie` (`dependencies: ['cookie']`).
+
+#### Cookie alone vs Session
+
+| | Только `@fastify/cookie` | `@fastify/cookie` + `@fastify/session` |
+|---|--------------------------|----------------------------------------|
+| Что в браузере | Любые пары ключ–значение (`visited`, `demo_visits`) | Короткий **sessionId** |
+| Где данные | Вся информация в cookie (лимит ~4 KB, видна клиенту) | **На сервере** (in-memory store): `userId`, корзина, роли |
+| Вход / выход | Приходится самому класть `userId` в cookie — небезопасно | `request.session.userId`; `session.destroy()` при выходе |
+| Подделка | Только `signed: true` защищает от изменения | Id сессии + серверная проверка |
+
+**Зачем session в этом проекте:**
+
+1. **Вход и профиль** — после логина в сессии хранится только `userId`; email и имя подгружаются из репозитория (`plugins/auth-context.js` → `currentUser` в шаблонах).
+2. **Выход** — `POST /auth/logout` уничтожает сессию на сервере; повторный заход на `/auth/profile` без cookie сессии ведёт на страницу входа (вместе с `Cache-Control: no-store` браузер не показывает старый HTML из кэша).
+3. **Не кладём пароль и лишние PII в cookie** — в браузере только идентификатор сессии.
+
+`plugins/auth-context.js` на каждый запрос читает `request.session.userId`, находит пользователя и кладёт `{ id, username, email }` в `reply.locals.currentUser` для шапки и страниц.
+
+Секрет сессии: `SESSION_SECRET` (минимум 32 символа). В dev — значение по умолчанию в `plugins/session.js`.
+
+Тесты: `test/routes/auth.test.js` (регистрация, неверный пароль, logout, шапка).
+
 ### Cache-Control: no-store
 
 Плагин `plugins/no-cache.js` через хук `onSend` добавляет ко **всем ответам** заголовок:
@@ -428,7 +507,7 @@ Cache-Control: no-store
 |------------------------|---------------------|
 | Браузер может сохранить HTML/JSON и показать **устаревший** список пользователей или курсов после POST/PATCH/DELETE | Каждый запрос заново загружает актуальные данные с сервера |
 | После «Назад» в истории показывается **кэшированная** форма или страница (в т.ч. `/users`, редактирование с email) | Страницы не подставляются из локального кэша — нужен новый запрос к серверу |
-| **Конфиденциальные данные** (личный кабинет банка, профиль соцсети, история заказов): пользователь вышел из аккаунта, другой человек жмёт «Назад» — браузер показывает страницу **с диска без запроса к серверу** | При «Назад» браузер делает **реальный запрос**; сервер видит, что сессии нет, и отправляет на вход (в этом проекте auth пока нет, но заголовок готовит поведение для персональных данных) |
+| **Конфиденциальные данные** (личный кабинет, `/auth/profile`): после выхода другой человек жмёт «Назад» — браузер может показать страницу **с диска без запроса** | При «Назад» — **реальный запрос**; без сессии сервер редиректит на `/auth/login` |
 | **Публичный компьютер** (интернет-кафе, библиотека): HTML и данные форм остаются **на жёстком диске** общего ПК | Копии просмотренных страниц **не сохраняются** на диске устройства (дополнение к выходу из аккаунта, не замена) |
 | Прокси и CDN могут **закэшировать** ответ и отдать его другому клиенту | Явный запрет хранить ответ где угодно (диск, память, промежуточные узлы) |
 
@@ -457,6 +536,8 @@ npm test
 - [fastify-reverse-routes](https://github.com/dimonnwc3/fastify-reverse-routes) — генерация URL по имени маршрута
 - [Плагины](https://fastify.dev/docs/latest/Reference/Plugins/)
 - [@fastify/autoload](https://github.com/fastify/fastify-autoload) — автозагрузка `routes/` и `plugins/`
+- [@fastify/cookie](https://github.com/fastify/fastify-cookie) — cookie в запросах и ответах
+- [@fastify/session](https://github.com/fastify/session) — серверные сессии (вход, профиль)
 - [@fastify/formbody](https://github.com/fastify/fastify-formbody) — парсинг HTML-форм
 - [@fastify/view](https://github.com/fastify/point-of-view) — шаблонизатор Pug
 - [@fastify/static](https://github.com/fastify/fastify-static) — статические файлы (`/assets/`)

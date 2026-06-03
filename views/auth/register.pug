@@ -1,0 +1,49 @@
+extends ../layout/page
+
+block content
+  h1.mb-4 Регистрация
+  form(method="POST" action=reverse(RouteNames.AUTH_REGISTER_POST) novalidate)
+    .mb-3
+      label.form-label(for="username") Имя пользователя
+      input.form-control#username(
+        type="text"
+        name="username"
+        value=values && values.username ? values.username : ''
+        class=(errors && errors.username) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.username
+        .invalid-feedback= errors.username
+    .mb-3
+      label.form-label(for="email") Email
+      input.form-control#email(
+        type="email"
+        name="email"
+        value=values && values.email ? values.email : ''
+        class=(errors && errors.email) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.email
+        .invalid-feedback= errors.email
+    .mb-3
+      label.form-label(for="password") Пароль
+      input.form-control#password(
+        type="password"
+        name="password"
+        class=(errors && errors.password) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.password
+        .invalid-feedback= errors.password
+    .mb-3
+      label.form-label(for="passwordConfirm") Подтверждение пароля
+      input.form-control#passwordConfirm(
+        type="password"
+        name="passwordConfirm"
+        class=(errors && errors.passwordConfirm) ? 'is-invalid' : undefined
+        required
+      )
+      if errors && errors.passwordConfirm
+        .invalid-feedback= errors.passwordConfirm
+    button.btn.btn-primary(type="submit") Зарегистрироваться
+    a.btn.btn-secondary.ms-2(href=reverse(RouteNames.AUTH_LOGIN)) Уже есть аккаунт

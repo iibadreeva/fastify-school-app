@@ -1,0 +1,17 @@
+extends ../layout/page
+
+block content
+  h1.mb-4 Профиль
+  .card
+    .card-body
+      p.mb-1
+        strong Имя:
+        |  #{user.username}
+      p.mb-1
+        strong Email:
+        |  #{user.email}
+      p.text-muted.small.mb-0 ID: #{user.id}
+  .mt-4
+    a.btn.btn-outline-primary(href=reverse(RouteNames.USERS_INDEX)) Список пользователей
+    form.d-inline(method="POST" action=reverse(RouteNames.AUTH_LOGOUT))
+      button.btn.btn-outline-danger.ms-2(type="submit") Выйти
