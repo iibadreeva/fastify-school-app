@@ -18,6 +18,10 @@ repositories/     — SQLite (CRUD, пейджинг, поиск)
 views/ (Pug)      — HTML-ответ
 ```
 
+## Демо
+
+- [Деплой проекта](https://fastify-school-app.onrender.com/)
+
 ## Создан проект с помощью
 
 ```bash
@@ -673,3 +677,6 @@ npm test
 
 - [Встроенный тест-раннер `node:test`](https://nodejs.org/api/test.html)
 - [Fastify CLI](https://www.npmjs.com/package/fastify-cli)
+
+### Деплой
+- [Render](https://render.com/)
