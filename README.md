@@ -1,6 +1,6 @@
 # fastify-school-app
 
-Учебное SSR-приложение на [Fastify](https://fastify.dev/) ([Fastify CLI](https://www.npmjs.com/package/fastify-cli)): HTML через [Pug](https://pugjs.org/) и Bootstrap, данные в [SQLite](https://www.sqlite.org/) (`sqlite3`). Есть сессии, вход/регистрация, flash-сообщения, CRUD пользователей и курсов с валидацией [Yup](https://github.com/jquense/yup). Маршруты и плагины подключаются автоматически из `routes/` и `plugins/` ([@fastify/autoload](https://github.com/fastify/fastify-autoload)); отдельные JSON-эндпоинты — в `routes/root.js`.
+Учебное SSR-приложение на [Fastify](https://fastify.dev/) ([Fastify CLI](https://www.npmjs.com/package/fastify-cli)): HTML через [Pug](https://pugjs.org/) и Bootstrap, данные в [SQLite](https://www.sqlite.org/) через [sql.js](https://sql.js.org/) (WASM, без native-модулей). Есть сессии, вход/регистрация, flash-сообщения, CRUD пользователей и курсов с валидацией [Yup](https://github.com/jquense/yup). Маршруты и плагины подключаются автоматически из `routes/` и `plugins/` ([@fastify/autoload](https://github.com/fastify/fastify-autoload)); отдельные JSON-эндпоинты — в `routes/root.js`.
 
 Многослойный монолит (layered monolith): HTTP → плагины → маршруты → контроллеры → репозитории → шаблоны.
 
@@ -43,7 +43,6 @@ npm run dev
 | Команда        | Назначение |
 |----------------|------------|
 | `npm run dev`  | Режим разработки: автоперезагрузка (`-w`), логи; папка `data/` (SQLite) **не** отслеживается — иначе после регистрации сервер перезапускается и отдаёт 503 |
-| `npm run build`| Сборка native-модуля `sqlite3` на сервере (Render: `npm ci && npm run build`) |
 | `npm start`    | Production: слушает `0.0.0.0`, порт из `PORT` (Render задаёт автоматически) |
 | `npm test`     | Запуск тестов (встроенный `node:test`) |
 
@@ -483,9 +482,9 @@ http://127.0.0.1:3000/test/%3Cscript%3Ealert('attack!')%3B%3C%2Fscript%3E
 
 Плагины оформляются через [`fastify-plugin`](https://github.com/fastify/fastify-plugin) (`fp`), чтобы декораторы и хуки были видны снаружи папки `plugins/` (см. комментарий в `support.js`).
 
-### SQLite (`sqlite3`)
+### SQLite (`sql.js`)
 
-Плагин `plugins/database.js` (имя `database`) открывает БД при старте и закрывает при `onClose`.
+Плагин `plugins/database.js` (имя `database`) открывает БД при старте и закрывает при `onClose`. Движок — **sql.js** (SQLite в WebAssembly): работает на Windows, Linux и Render **без** native-бинарников и ошибок `GLIBC_2.38` / `ERR_DLOPEN_FAILED`.
 
 | Переменная / режим | Путь к файлу |
 |--------------------|--------------|
@@ -593,7 +592,7 @@ Cache-Control: no-store
 
 ## Деплой на Render
 
-В репозитории есть [`render.yaml`](render.yaml) (Blueprint). Главная проблема на Linux — **prebuilt-бинарник `sqlite3` с GLIBC 2.38** не совпадает с окружением Render; решается пересборкой на сервере.
+В репозитории есть [`render.yaml`](render.yaml) (Blueprint). БД на **sql.js** (WASM) — отдельная сборка native-модулей не нужна.
 
 ### Через Blueprint (рекомендуется)
 
@@ -604,7 +603,7 @@ Cache-Control: no-store
 
 | Поле | Значение |
 |------|----------|
-| **Build Command** | `npm ci && npm run build` |
+| **Build Command** | `npm ci` |
 | **Start Command** | `npm start` |
 | **Node** | 20+ |
 
@@ -621,8 +620,8 @@ Cache-Control: no-store
 
 ### Важно
 
-- **`node_modules` не коммитить** — Render ставит зависимости сам; иначе снова `ERR_DLOPEN_FAILED` / `GLIBC_2.38`.
-- После смены build-команды: **Clear build cache & deploy**.
+- **`node_modules` не коммитить** — Render ставит зависимости сам.
+- После смены зависимостей: **Clear build cache & deploy**.
 - `npm start` слушает `0.0.0.0`; порт берётся из `PORT` (Render задаёт автоматически).
 - В production cookie сессии с `secure: true` (HTTPS на Render).
 
