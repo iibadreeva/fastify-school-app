@@ -12,7 +12,7 @@ export default fp(async function authContextPlugin (fastify) {
     const userId = request.session?.userId
 
     if (userId) {
-      const user = findUserById(userId)
+      const user = await findUserById(userId)
 
       if (user) {
         currentUser = {
@@ -32,4 +32,4 @@ export default fp(async function authContextPlugin (fastify) {
       flashMessages: getFlashMessages(reply),
     }
   })
-}, { name: 'auth-context', dependencies: ['session', 'flash'] })
+}, { name: 'auth-context', dependencies: ['database', 'session', 'flash'] })

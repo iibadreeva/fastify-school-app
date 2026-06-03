@@ -12,6 +12,8 @@ const AppPath = path.join(__dirname, '..', 'app.js')
 // Fill in this config with all the configurations
 // needed for testing the application
 function config () {
+  process.env.DATABASE_PATH = ':memory:'
+
   return {
     skipOverride: true // Register our application with fastify-plugin
   }

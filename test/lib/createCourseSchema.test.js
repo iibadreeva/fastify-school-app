@@ -1,6 +1,15 @@
-import { test } from 'node:test'
+import { after, before, test } from 'node:test'
 import * as assert from 'node:assert'
+import { closeDatabase, openDatabase } from '../../lib/db/connection.js'
 import { createCourseSchema } from '../../lib/schemas/createCourseSchema.js'
+
+before(async () => {
+  await openDatabase(':memory:')
+})
+
+after(async () => {
+  await closeDatabase()
+})
 
 test('createCourseSchema accepts valid data', async () => {
   const data = await createCourseSchema.validate({

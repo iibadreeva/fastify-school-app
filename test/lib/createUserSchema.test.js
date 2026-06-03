@@ -1,9 +1,18 @@
-import { test } from 'node:test'
+import { after, before, test } from 'node:test'
 import * as assert from 'node:assert'
+import { closeDatabase, openDatabase } from '../../lib/db/connection.js'
 import getUsers from '../../lib/getUsers.js'
 import { createUserSchema } from '../../lib/schemas/createUserSchema.js'
 
 const existingEmail = getUsers()[0].email
+
+before(async () => {
+  await openDatabase(':memory:')
+})
+
+after(async () => {
+  await closeDatabase()
+})
 
 test('createUserSchema accepts valid data', async () => {
   const data = await createUserSchema.validate({

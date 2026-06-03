@@ -1,18 +1,19 @@
 # fastify-school-app
 
-Веб-приложение на [Fastify](https://fastify.dev/), собранное через [Fastify CLI](https://www.npmjs.com/package/fastify-cli). Отдаёт JSON и HTML-страницы (шаблоны Pug). Маршруты и плагины подключаются автоматически из папок `routes/` и `plugins/`.
+Учебное SSR-приложение на [Fastify](https://fastify.dev/) ([Fastify CLI](https://www.npmjs.com/package/fastify-cli)): HTML через [Pug](https://pugjs.org/) и Bootstrap, данные в [SQLite](https://www.sqlite.org/) (`sqlite3`). Есть сессии, вход/регистрация, flash-сообщения, CRUD пользователей и курсов с валидацией [Yup](https://github.com/jquense/yup). Маршруты и плагины подключаются автоматически из `routes/` и `plugins/` ([@fastify/autoload](https://github.com/fastify/fastify-autoload)); отдельные JSON-эндпоинты — в `routes/root.js`.
 
-Если назвать одним словом — это многослойное монолитное веб-приложение (layered monolith) на Fastify (SSR).
-```bash
+Многослойный монолит (layered monolith): HTTP → плагины → маршруты → контроллеры → репозитории → шаблоны.
+
+```
 HTTP-запрос
     ↓
-plugins/          — инфраструктура (cookie, session, auth-context, no-cache, …)
+plugins/          — SQLite, cookie, session, flash, auth-context, no-cache, …
     ↓
 routes/           — маршрутизация (URL → обработчик)
     ↓
 controllers/      — сценарии HTTP (валидация, редирект, выбор шаблона)
     ↓
-repositories/     — данные в памяти (CRUD, пейджинг)
+repositories/     — SQLite (CRUD, пейджинг, поиск)
     ↓
 views/ (Pug)      — HTML-ответ
 ```
@@ -41,7 +42,7 @@ npm run dev
 
 | Команда        | Назначение |
 |----------------|------------|
-| `npm run dev`  | Режим разработки: автоперезагрузка при изменении файлов (`-w`), подробные логи, pretty-print |
+| `npm run dev`  | Режим разработки: автоперезагрузка (`-w`), логи; папка `data/` (SQLite) **не** отслеживается — иначе после регистрации сервер перезапускается и отдаёт 503 |
 | `npm start`    | Запуск в production-режиме |
 | `npm test`     | Запуск тестов (встроенный `node:test`) |
 
@@ -53,6 +54,7 @@ fastify-school-app/
 ├── plugins/            # Общие плагины (декораторы, хуки, утилиты)
 │   ├── sensible.js     # Удобные HTTP-ошибки (@fastify/sensible)
 │   ├── support.js      # Пример кастомного декоратора
+│   ├── database.js     # SQLite: схема, сиды, закрытие при остановке
 │   ├── cookie.js       # Cookie: request.cookies, reply.setCookie
 │   ├── session.js      # Серверные сессии (@fastify/session)
 │   ├── flash.js        # Flash-сообщения (@fastify/flash)
@@ -65,7 +67,9 @@ fastify-school-app/
 │   ├── reverse-routes.js # Именованные URL (fastify.reverse)
 │   └── static.js       # Bootstrap CSS (/assets/)
 ├── lib/
-│   ├── getUsers.js     # Начальные данные пользователей (@faker-js/faker)
+│   ├── db/
+│   │   └── connection.js         # SQLite: открытие, схема, сиды
+│   ├── getUsers.js     # Начальные пользователи для сида (@faker-js/faker)
 │   ├── normalizeEmail.js
 │   ├── hashPassword.js
 │   ├── RouteNames.js   # Константы имён маршрутов (для fastify.reverse)
@@ -88,8 +92,8 @@ fastify-school-app/
 │   │   ├── formatYupErrors.js    # Ошибки Yup → объект для Pug
 │   │   └── stripFormMethod.js    # _method PATCH/DELETE в HTML-формах
 │   └── repositories/
-│       ├── usersRepository.js   # In-memory хранилище пользователей
-│       └── coursesRepository.js # In-memory хранилище курсов
+│       ├── usersRepository.js   # Пользователи (SQLite)
+│       └── coursesRepository.js # Курсы (SQLite)
 ├── views/              # Pug-шаблоны
 │   ├── layout/
 │   │   └── page.pug    # Layout: навигация, Вход/Профиль/Выход
@@ -240,7 +244,7 @@ form(method="POST" action=reverse(RouteNames.DELETE_USER, { id: user.id }))
 | `POST` | `/users/:id` | — | То же, что PATCH/DELETE при `_method` в форме |
 | `GET` | `/users/:id` | `showUser` | Карточка; кнопка «Редактировать» |
 
-Данные — `lib/repositories/usersRepository.js` (in-memory). Стартовые пользователи: `lib/getUsers.js` (25 записей, фиксированный seed). Список: `getUsersPage(page)` — по 10 пользователей, query-параметр `page` (с 1). Email нормализуется (`lib/normalizeEmail.js`), пароль хешируется (`lib/hashPassword.js`).
+Данные — `lib/repositories/usersRepository.js` (SQLite через `lib/db/connection.js`). При первом запуске в пустую БД подставляются 25 пользователей из `lib/getUsers.js` (фиксированный seed faker). Список: `getUsersPage(page)` — по 10 пользователей, query-параметр `page` (с 1). Email нормализуется (`lib/normalizeEmail.js`), пароль хешируется (`lib/hashPassword.js`). Файл БД по умолчанию: `data/app.sqlite` (в `.gitignore`); в тестах — `:memory:`.
 
 #### Создание (POST)
 
@@ -320,7 +324,7 @@ export default function normalizeEmail (email) {
 | `GET` | `/courses?q=JavaScript` | Оба курса — подстрока в описании |
 | `GET` | `/courses?q=python` | «Курсы не найдены» |
 
-Данные — `lib/repositories/coursesRepository.js`. Формы — `@fastify/formbody` (`plugins/formbody.js`).
+Данные — `lib/repositories/coursesRepository.js` (SQLite). Стартовые курсы: «JS: Массивы» (id=1), «JS: Функции» (id=2). Формы — `@fastify/formbody` (`plugins/formbody.js`).
 
 #### Создание (POST)
 
@@ -478,6 +482,22 @@ http://127.0.0.1:3000/test/%3Cscript%3Ealert('attack!')%3B%3C%2Fscript%3E
 
 Плагины оформляются через [`fastify-plugin`](https://github.com/fastify/fastify-plugin) (`fp`), чтобы декораторы и хуки были видны снаружи папки `plugins/` (см. комментарий в `support.js`).
 
+### SQLite (`sqlite3`)
+
+Плагин `plugins/database.js` (имя `database`) открывает БД при старте и закрывает при `onClose`.
+
+| Переменная / режим | Путь к файлу |
+|--------------------|--------------|
+| `DATABASE_PATH` | Явный путь (в тестах helper задаёт `:memory:`) |
+| production / dev | `data/app.sqlite` (создаётся автоматически) |
+| `NODE_ENV=test` | `:memory:` (если `DATABASE_PATH` не задан) |
+
+Таблицы `users` и `courses` создаются в `lib/db/connection.js`. Если таблица `users` пуста — один раз загружаются сиды из `getUsers()` и два начальных курса. Репозитории — асинхронные (`await findUserById`, `await createUser`, …). `auth-context` зависит от плагина `database`.
+
+Чтобы сбросить данные в dev, удалите `data/app.sqlite` и перезапустите приложение.
+
+**503 при регистрации в dev:** JSON `{"error":"Service Unavailable","statusCode":503}` обычно значит, что запрос попал в момент перезапуска сервера (`-w`). Частая причина — изменение `data/app.sqlite` без `--ignore-watch=data` (исправлено в `npm run dev`). Перезапустите сервер один раз и повторите отправку формы.
+
 ### Логирование HTTP-запросов (dev)
 
 | Плагин | Пакет | Назначение |
@@ -563,7 +583,7 @@ Cache-Control: no-store
 | **Публичный компьютер** (интернет-кафе, библиотека): HTML и данные форм остаются **на жёстком диске** общего ПК | Копии просмотренных страниц **не сохраняются** на диске устройства (дополнение к выходу из аккаунта, не замена) |
 | Прокси и CDN могут **закэшировать** ответ и отдать его другому клиенту | Явный запрет хранить ответ где угодно (диск, память, промежуточные узлы) |
 
-`no-store` строже, чем `no-cache`: сервер и клиент **не должны сохранять** копию ответа. Для приложения с in-memory данными и HTML-формами это разумное значение по умолчанию.
+`no-store` строже, чем `no-cache`: сервер и клиент **не должны сохранять** копию ответа. Для приложения с данными в SQLite и HTML-формами это разумное значение по умолчанию.
 
 Проверка в DevTools → Network: у любого ответа (например `GET /users`) в заголовках Response должно быть `cache-control: no-store`.
 
