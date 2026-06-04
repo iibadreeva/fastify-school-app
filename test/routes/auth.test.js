@@ -4,6 +4,53 @@ import { build, mergeCookieHeaders, sessionCookieFromResponse } from '../helper.
 
 const formHeaders = { 'content-type': 'application/x-www-form-urlencoded' }
 
+test('register sets session cookie behind HTTPS proxy in production', async (t) => {
+  const prevNodeEnv = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  t.after(() => {
+    if (prevNodeEnv === undefined) {
+      delete process.env.NODE_ENV
+    } else {
+      process.env.NODE_ENV = prevNodeEnv
+    }
+  })
+
+  const app = await build(t)
+  const email = `proxy-${Date.now()}@example.com`
+
+  const register = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    headers: {
+      ...formHeaders,
+      'x-forwarded-proto': 'https',
+    },
+    payload: new URLSearchParams({
+      username: 'Proxy User',
+      email,
+      password: 'secret12',
+      passwordConfirm: 'secret12',
+    }).toString(),
+  })
+
+  assert.equal(register.statusCode, 302)
+
+  const sessionCookie = sessionCookieFromResponse(register)
+  assert.ok(sessionCookie, 'expected Set-Cookie after register in production')
+  assert.match(sessionCookie, /sessionId=/)
+
+  const profile = await app.inject({
+    url: '/auth/profile',
+    headers: {
+      cookie: sessionCookie,
+      'x-forwarded-proto': 'https',
+    },
+  })
+
+  assert.equal(profile.statusCode, 200)
+  assert.match(profile.payload, /Proxy User/)
+})
+
 test('register logs in and opens profile', async (t) => {
   const app = await build(t)
   const email = `auth-${Date.now()}@example.com`

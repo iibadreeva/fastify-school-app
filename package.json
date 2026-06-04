@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "node --test test/**/*.test.js",
-    "start": "fastify start -l info app.js -a 0.0.0.0",
+    "start": "fastify start -l info app.js -a 0.0.0.0 -o",
     "dev": "fastify start -w -l info -P app.js --ignore-watch=data"
   },
   "engines": {

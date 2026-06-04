@@ -7,7 +7,10 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Pass --options via CLI arguments in command to enable these options.
-export const options = {}
+// trustProxy: Render (и другие PaaS) терминируют HTTPS; без этого secure-cookie сессии не ставятся.
+export const options = {
+  trustProxy: true,
+}
 
 export default async function (fastify, opts) {
   // SQLite до остальных плагинов (репозитории используют getDb() при запросах)
